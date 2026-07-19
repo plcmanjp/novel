@@ -1,17 +1,5 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-07-19T09:00:00+09:00",
-  "series": [
-    {
-      "series_id": "sample-starlit-garden",
-      "title": "별빛 정원의 마지막 관리인",
-      "genre": "판타지",
-      "status": "active",
-      "summary": "밤마다 스스로 자라나는 정원과, 그 정원을 지키는 마지막 관리인의 이야기. 사라진 별을 되찾기 위한 조용한 여정이 시작된다.",
-      "latest_episode": 3,
-      "episode_count": 3,
-      "started_at": "2026-07-17T07:00:00+09:00",
-      "updated_at": "2026-07-19T07:00:00+09:00"
-    }
-  ]
+  "generated_at": "2026-07-19T12:00:00+09:00",
+  "series": []
 }
