@@ -105,6 +105,11 @@
     return iso.slice(0, 10);
   }
 
+  function seriesTitle(o) {
+    // 봇 공개 스키마는 series_title 을 방출(004 확정 계약·불변). 구 title 은 fallback.
+    return (o && (o.series_title || o.title)) || "";
+  }
+
   function statusBadge(status) {
     var s = STATUS[status] || { ko: status || "알 수 없음", cls: "b-abandoned" };
     return el("span", "badge " + s.cls, s.ko);
@@ -202,7 +207,7 @@
     if (s.genre) row1.appendChild(el("span", "genre", s.genre));
     row1.appendChild(statusBadge(s.status));
     a.appendChild(row1);
-    a.appendChild(el("h3", null, s.title || "(제목 없음)"));
+    a.appendChild(el("h3", null, seriesTitle(s) || "(제목 없음)"));
     if (s.summary) a.appendChild(el("p", "desc", s.summary));
     var foot = el("div", "foot");
     if (s.latest_episode != null) {
@@ -233,7 +238,7 @@
       var cb = el("div", "crumb");
       var home = el("a", null, "연재관"); home.href = "#/"; cb.appendChild(home);
       cb.appendChild(el("span", "sep", "/"));
-      cb.appendChild(el("span", null, m.title || seriesId));
+      cb.appendChild(el("span", null, seriesTitle(m) || seriesId));
       app.appendChild(cb);
 
       // head
@@ -242,7 +247,7 @@
       if (m.genre) row1.appendChild(el("span", "genre", m.genre));
       row1.appendChild(statusBadge(m.status));
       head.appendChild(row1);
-      head.appendChild(el("h1", "page-h", m.title || "(제목 없음)"));
+      head.appendChild(el("h1", "page-h", seriesTitle(m) || "(제목 없음)"));
       if (m.summary) head.appendChild(el("p", "intro", m.summary));
 
       var facts = el("div", "facts");
@@ -303,13 +308,13 @@
       var prev = pos > 0 ? eps[pos - 1] : null;
       var next = (pos >= 0 && pos < eps.length - 1) ? eps[pos + 1] : null;
 
-      setNavTitle(m.title || seriesId, "· " + epNo + "화");
+      setNavTitle(seriesTitle(m) || seriesId, "· " + epNo + "화");
 
       // breadcrumb
       var cb = el("div", "crumb");
       var home = el("a", null, "연재관"); home.href = "#/"; cb.appendChild(home);
       cb.appendChild(el("span", "sep", "/"));
-      var sl = el("a", null, m.title || seriesId); sl.href = "#/s/" + encodeURIComponent(seriesId); cb.appendChild(sl);
+      var sl = el("a", null, seriesTitle(m) || seriesId); sl.href = "#/s/" + encodeURIComponent(seriesId); cb.appendChild(sl);
       cb.appendChild(el("span", "sep", "/"));
       cb.appendChild(el("span", null, epNo + "화"));
       app.appendChild(cb);
