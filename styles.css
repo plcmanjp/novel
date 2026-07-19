@@ -1,0 +1,202 @@
+/* PLCManJP · AI 웹소설 연재관 — 텍스트 전용 정적 리더
+   랜딩(index.html) 다크 팔레트 계승. 외부 폰트·프레임워크·이미지 의존 없음. */
+:root{
+  --bg:#0c1016; --bg2:#11161f; --card:#161c27; --card2:#1b2230;
+  --line:#252e3d; --line2:#36465e;
+  --tx:#e7ecf3; --tx2:#9aa6b6; --tx3:#6b7689;
+  --acc:#3b82f6; --acc2:#22d3ee; --ok:#34d399; --warn:#fbbf24; --mute:#7b8698;
+  --sans:-apple-system,"Segoe UI","Pretendard","Apple SD Gothic Neo","Malgun Gothic",Roboto,sans-serif;
+  --serif:"Iropke Batang","Noto Serif KR","Apple SD Gothic Neo","Malgun Gothic",Georgia,serif;
+  /* 리더 사용자 설정 (app.js가 localStorage에서 덮어씀) */
+  --read-size:1.12rem;
+  --read-lh:1.95;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--sans);
+  background:var(--bg); color:var(--tx); line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+  min-height:100vh;
+}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:760px;margin:0 auto;padding:0 20px}
+
+/* ── 상단바 ── */
+header.top{
+  position:sticky; top:0; z-index:20;
+  background:rgba(12,16,22,.86); backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+}
+.top .wrap{display:flex;align-items:center;gap:12px;height:56px}
+.top .home{
+  display:inline-flex;align-items:center;gap:7px;
+  font-size:.82rem;font-weight:700;letter-spacing:.02em;color:var(--tx2);
+  padding:6px 11px;border:1px solid var(--line);border-radius:999px;
+  transition:border-color .18s,color .18s;flex:0 0 auto;
+}
+.top .home:hover{border-color:var(--line2);color:var(--tx)}
+.top .home svg{width:13px;height:13px}
+.top .title{
+  font-size:.95rem;font-weight:800;letter-spacing:-.01em;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;
+}
+.top .title .g{background:linear-gradient(92deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.top .gear{
+  flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;
+  width:36px;height:36px;border:1px solid var(--line);border-radius:10px;
+  color:var(--tx2);cursor:pointer;background:transparent;transition:border-color .18s,color .18s;
+}
+.top .gear:hover{border-color:var(--line2);color:var(--tx)}
+.top .gear svg{width:17px;height:17px}
+.top .gear[hidden]{display:none}
+
+/* ── 리더 설정 패널 ── */
+.settings{
+  border-bottom:1px solid var(--line);background:var(--bg2);
+  overflow:hidden;max-height:0;transition:max-height .25s ease;
+}
+.settings.open{max-height:260px}
+.settings .wrap{padding:0 20px}
+.settings.open .wrap{padding:18px 20px}
+.set-row{display:flex;align-items:center;gap:14px;margin:0 0 14px}
+.set-row:last-child{margin-bottom:0}
+.set-row .lbl{font-size:.8rem;font-weight:700;color:var(--tx2);flex:0 0 78px}
+.stepper{display:flex;align-items:center;gap:8px}
+.stepper button{
+  width:34px;height:34px;border:1px solid var(--line);border-radius:9px;
+  background:var(--card);color:var(--tx);font-size:1.1rem;font-weight:700;cursor:pointer;
+  transition:border-color .15s,background .15s;
+}
+.stepper button:hover{border-color:var(--line2);background:var(--card2)}
+.stepper button:disabled{opacity:.35;cursor:not-allowed}
+.stepper .val{font-size:.84rem;color:var(--tx2);min-width:56px;text-align:center;font-variant-numeric:tabular-nums}
+.set-reset{margin-left:auto;font-size:.78rem;color:var(--tx3);border:1px solid var(--line);background:transparent;padding:7px 12px;border-radius:9px;cursor:pointer}
+.set-reset:hover{color:var(--tx2);border-color:var(--line2)}
+
+/* ── 공통 콘텐츠 ── */
+/* main 은 .wrap 클래스도 가지므로 .wrap{padding:0 20px} 가 세로 패딩을 덮는다.
+   id 선택자로 특정성을 올려 상/하 여백을 확실히 준다(좌우는 .wrap 20px 유지). */
+#app{padding-top:30px;padding-bottom:104px}
+.crumb{font-size:.8rem;color:var(--tx3);margin-bottom:20px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.crumb a{color:var(--tx2);font-weight:600}
+.crumb a:hover{color:var(--acc2)}
+.crumb .sep{color:var(--line2)}
+
+.page-h{font-size:1.7rem;font-weight:800;letter-spacing:-.02em;line-height:1.25;margin-bottom:8px}
+.page-sub{font-size:.9rem;color:var(--tx2);margin-bottom:28px}
+
+/* 상태 배지 */
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:.72rem;font-weight:700;padding:4px 10px;border-radius:999px;white-space:nowrap}
+.badge::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.b-active{color:var(--ok);background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.28)}
+.b-paused{color:var(--warn);background:rgba(251,191,36,.11);border:1px solid rgba(251,191,36,.28)}
+.b-completed{color:var(--acc2);background:rgba(34,211,238,.10);border:1px solid rgba(34,211,238,.26)}
+.b-abandoned{color:var(--mute);background:rgba(123,134,152,.12);border:1px solid rgba(123,134,152,.28)}
+
+/* ── 작품 목록 ── */
+.series-list{display:flex;flex-direction:column;gap:16px}
+.series-card{
+  display:block;background:linear-gradient(180deg,var(--card),var(--card2));
+  border:1px solid var(--line);border-radius:16px;padding:22px 22px;
+  transition:border-color .2s,transform .2s;
+}
+.series-card:hover{border-color:var(--line2);transform:translateY(-2px)}
+.series-card .row1{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.series-card .genre{font-size:.74rem;font-weight:700;color:var(--acc2);letter-spacing:.03em}
+.series-card h3{font-size:1.22rem;font-weight:750;letter-spacing:-.01em;margin-bottom:9px}
+.series-card .desc{font-size:.9rem;color:var(--tx2);line-height:1.6;margin-bottom:16px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.series-card .foot{display:flex;gap:16px;flex-wrap:wrap;font-size:.78rem;color:var(--tx3)}
+.series-card .foot b{color:var(--tx2);font-weight:650}
+
+/* ── 작품 상세 ── */
+.detail-head{background:linear-gradient(180deg,var(--card),var(--card2));border:1px solid var(--line);border-radius:16px;padding:24px 22px;margin-bottom:26px}
+.detail-head .row1{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.detail-head .genre{font-size:.75rem;font-weight:700;color:var(--acc2);letter-spacing:.03em}
+.detail-head p.intro{font-size:.94rem;color:var(--tx2);line-height:1.7;margin:14px 0 18px}
+.detail-head .facts{display:flex;gap:18px;flex-wrap:wrap;font-size:.8rem;color:var(--tx3);margin-bottom:18px}
+.detail-head .facts b{color:var(--tx2);font-weight:650}
+.detail-head .cta{display:flex;gap:10px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:7px;font-size:.85rem;font-weight:650;padding:10px 16px;border-radius:11px;cursor:pointer;border:0;transition:opacity .15s,border-color .15s,background .15s}
+.btn:hover{opacity:.92}
+.btn-primary{background:linear-gradient(92deg,var(--acc),#2f6fe0);color:#fff}
+.btn-ghost{background:rgba(255,255,255,.05);color:var(--tx);border:1px solid var(--line)}
+.btn-ghost:hover{border-color:var(--line2)}
+
+.ep-index-h{font-size:.8rem;letter-spacing:.14em;text-transform:uppercase;color:var(--tx3);font-weight:700;margin-bottom:14px}
+.ep-list{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.ep-item{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line);transition:background .15s}
+.ep-item:last-child{border-bottom:0}
+.ep-item:hover{background:var(--card)}
+.ep-item .no{font-size:.78rem;font-weight:700;color:var(--tx3);flex:0 0 auto;font-variant-numeric:tabular-nums;min-width:44px}
+.ep-item .et{font-size:.92rem;color:var(--tx);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ep-item .em{font-size:.74rem;color:var(--tx3);flex:0 0 auto}
+
+/* ── 리더(회차 본문) ── */
+.reader-head{margin-bottom:26px;padding-bottom:22px;border-bottom:1px solid var(--line)}
+.reader-head .epno{font-size:.8rem;font-weight:700;color:var(--acc2);letter-spacing:.03em;margin-bottom:8px}
+.reader-head h1{font-size:1.55rem;font-weight:800;letter-spacing:-.02em;line-height:1.3;margin-bottom:10px}
+.reader-head .rmeta{font-size:.78rem;color:var(--tx3);display:flex;gap:14px;flex-wrap:wrap}
+.reader-body{
+  font-family:var(--serif);
+  font-size:var(--read-size);
+  line-height:var(--read-lh);
+  color:#dbe2ec;
+  word-break:keep-all; overflow-wrap:anywhere;
+}
+.reader-body p{margin:0 0 1.35em}
+.reader-body p:last-child{margin-bottom:0}
+
+/* 이전/다음/목록 내비 — 한 줄 흐름 버튼 (박스/그리드 느낌 제거) */
+.epnav{display:flex;gap:10px;margin-top:48px;padding-top:28px;border-top:1px solid var(--line)}
+.epnav a,.epnav span{
+  display:inline-flex;align-items:center;gap:7px;
+  height:50px;padding:0 18px;
+  border:1px solid var(--line);border-radius:13px;
+  font-size:.9rem;color:var(--tx);
+  transition:border-color .18s,background .18s,transform .12s;
+}
+.epnav a:hover{border-color:var(--line2);background:rgba(255,255,255,.05);transform:translateY(-1px)}
+.epnav a:active{transform:translateY(0)}
+.epnav .prev{flex:1;justify-content:flex-start}
+.epnav .next{flex:1;justify-content:flex-end}
+.epnav .toc{flex:0 0 auto;justify-content:center;color:var(--tx2)}
+.epnav .lb{font-weight:650}
+.epnav .ar{font-size:1.05rem;color:var(--tx3);line-height:1}
+.epnav a:hover .ar{color:var(--acc2)}
+/* 회차번호: 라벨과 중점(·)으로 이어지는 한 덩어리 텍스트 — 별도 박스처럼 보이지 않게 */
+.epnav .epn{color:var(--tx3);font-weight:500;margin:0 -1px}
+.epnav .epn::before{content:"·";margin-right:6px;color:var(--line2)}
+.epnav .disabled{opacity:.4;cursor:default;pointer-events:none}
+
+/* ── 상태(로딩·빈·오류) ── */
+.state{text-align:center;padding:64px 20px;color:var(--tx3)}
+.state .ico{font-size:1.6rem;margin-bottom:14px;opacity:.6}
+.state h2{font-size:1.05rem;color:var(--tx2);font-weight:700;margin-bottom:8px}
+.state p{font-size:.88rem;line-height:1.6;max-width:360px;margin:0 auto 18px}
+.state .btn{margin:0 auto}
+.spinner{width:26px;height:26px;border:3px solid var(--line);border-top-color:var(--acc);border-radius:50%;margin:0 auto 16px;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── 푸터 ── */
+footer.site{border-top:1px solid var(--line);padding:32px 0 40px;text-align:center;color:var(--tx3);font-size:.78rem;background:var(--bg2)}
+footer.site .flinks{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:14px}
+footer.site a{color:var(--tx2);font-weight:600}
+footer.site a:hover{color:var(--tx)}
+footer.site .note{font-size:.72rem;line-height:1.7;max-width:520px;margin:0 auto;color:var(--tx3)}
+
+/* ── 모바일 (360px 기준 overflow 0) ── */
+@media(max-width:480px){
+  .wrap{padding:0 16px}
+  .page-h{font-size:1.42rem}
+  .reader-head h1{font-size:1.32rem}
+  .series-card,.detail-head{padding:20px 18px}
+  .top .title{font-size:.9rem}
+  .detail-head .cta{flex-direction:column}
+  .detail-head .cta .btn{width:100%;justify-content:center}
+  /* 이전/다음 내비: 좁은 폭에서 회차번호 숨기고 패딩 축소 → 3버튼이 한 줄에 */
+  .epnav{gap:8px}
+  .epnav a,.epnav span{height:46px;padding:0 13px;font-size:.85rem;gap:6px;min-width:0}
+  .epnav .epn{display:none}
+}

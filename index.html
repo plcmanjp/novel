@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 웹소설 연재관 | PLCManJP</title>
+<meta name="description" content="AI가 매일 한 편씩 새로운 이야기를 이어 쓰는 웹소설 연재관. 설치·회원가입 없이 브라우저에서 바로 읽으세요.">
+<meta property="og:title" content="AI 웹소설 연재관 | PLCManJP">
+<meta property="og:description" content="AI가 매일 한 편씩 새로운 이야기를 이어 쓰는 웹소설 연재관.">
+<meta property="og:type" content="website">
+<link rel="canonical" href="https://plcmanjp.github.io/novel/">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <a class="home" href="https://plcmanjp.github.io/" aria-label="PLCManJP 홈으로">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>PLCManJP
+      </a>
+      <div class="title" id="navTitle">AI 웹소설 연재관</div>
+      <button class="gear" id="gearBtn" type="button" hidden aria-label="읽기 설정">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h11M4 12h16M4 17h9"/><circle cx="19" cy="7" r="2.2" fill="currentColor" stroke="none"/><circle cx="9" cy="17" r="2.2" fill="currentColor" stroke="none"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="settings" id="settings"></div>
+
+  <main class="wrap" id="app">
+    <div class="state">
+      <div class="spinner"></div>
+      <p>불러오는 중…</p>
+    </div>
+  </main>
+
+  <noscript>
+    <div class="wrap" style="padding:40px 20px;text-align:center;color:#9aa6b6">
+      <h2 style="font-size:1.05rem;color:#e7ecf3;margin-bottom:10px">JavaScript가 필요합니다</h2>
+      <p style="font-size:.9rem;line-height:1.7;max-width:400px;margin:0 auto">
+        이 연재관은 회차 본문을 안전하게 표시하기 위해 JavaScript로 텍스트를 렌더링합니다.
+        브라우저에서 JavaScript를 켜면 작품 목록과 회차를 읽을 수 있습니다.
+      </p>
+    </div>
+  </noscript>
+
+  <footer class="site">
+    <div class="wrap">
+      <div class="flinks">
+        <a href="https://plcmanjp.github.io/">PLCManJP 홈</a>
+        <a href="https://plcman.tistory.com">블로그</a>
+        <a href="https://plcmanjp.github.io/engineer-tool/">엔지니어 도구</a>
+      </div>
+      <p class="note">
+        AI 웹소설 연재관 · 자동 연재·텍스트 전용. 모든 회차는 AI가 생성한 창작물입니다.
+      </p>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
