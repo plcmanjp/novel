@@ -169,11 +169,11 @@ header.top{
 
 /* 이전/다음/목록 내비 — 한 줄 흐름 버튼 (박스/그리드 느낌 제거) */
 .epnav{display:flex;gap:10px;margin-top:48px;padding-top:28px;border-top:1px solid var(--line)}
-.epnav a,.epnav span{
+.epnav > a,.epnav > span{
   display:inline-flex;align-items:center;gap:7px;
   height:50px;padding:0 18px;
   border:1px solid var(--line);border-radius:13px;
-  font-size:.9rem;color:var(--tx);
+  font-size:.9rem;color:var(--tx);white-space:nowrap;min-width:0;
   transition:border-color .18s,background .18s,transform .12s;
 }
 .epnav a:hover{border-color:var(--line2);background:rgba(255,255,255,.05);transform:translateY(-1px)}
@@ -181,12 +181,12 @@ header.top{
 .epnav .prev{flex:1;justify-content:flex-start}
 .epnav .next{flex:1;justify-content:flex-end}
 .epnav .toc{flex:0 0 auto;justify-content:center;color:var(--tx2)}
-.epnav .lb{font-weight:650}
+.epnav .ar,.epnav .lb,.epnav .epn{height:auto;padding:0;border:0;border-radius:0}
+.epnav .lb{font-weight:650;white-space:nowrap}
 .epnav .ar{font-size:1.05rem;color:var(--tx3);line-height:1}
 .epnav a:hover .ar{color:var(--acc2)}
-/* 회차번호: 라벨과 중점(·)으로 이어지는 한 덩어리 텍스트 — 별도 박스처럼 보이지 않게 */
+/* 회차번호: 라벨에 이어지는 한 덩어리 텍스트 */
 .epnav .epn{color:var(--tx3);font-weight:500;margin:0 -1px}
-.epnav .epn::before{content:"·";margin-right:6px;color:var(--line2)}
 .epnav .disabled{opacity:.4;cursor:default;pointer-events:none}
 
 /* ── 상태(로딩·빈·오류) ── */
@@ -218,7 +218,7 @@ footer.site .note{font-size:.72rem;line-height:1.7;max-width:520px;margin:0 auto
   .detail-head .cta .btn{width:100%;justify-content:center}
   /* 이전/다음 내비: 좁은 폭에서 회차번호 숨기고 패딩 축소 → 3버튼이 한 줄에 */
   .epnav{gap:8px}
-  .epnav a,.epnav span{height:46px;padding:0 13px;font-size:.85rem;gap:6px;min-width:0}
+  .epnav > a,.epnav > span{height:46px;padding:0 13px;font-size:.85rem;gap:6px}
   .epnav .epn{display:none}
 }
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.spinner{animation:none}.settings,.top .home,.top .gear,.stepper button{transition:none}}
