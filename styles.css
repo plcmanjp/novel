@@ -1,15 +1,35 @@
 /* PLCManJP · AI 웹소설 연재관 — 텍스트 전용 정적 리더
-   랜딩(index.html) 다크 팔레트 계승. 외부 폰트·프레임워크·이미지 의존 없음. */
+   시스템/라이트/다크 팔레트. 외부 폰트·프레임워크·이미지 의존 없음. */
 :root{
-  --bg:#0c1016; --bg2:#11161f; --card:#161c27; --card2:#1b2230;
-  --line:#252e3d; --line2:#36465e;
-  --tx:#e7ecf3; --tx2:#9aa6b6; --tx3:#6b7689;
+  color-scheme:light;
+  --bg:#f4f7fb; --bg2:#eaf0f7; --card:#ffffff; --card2:#f7f9fc;
+  --line:#d8e0ea; --line2:#9aabc0;
+  --tx:#182231; --tx2:#526174; --tx3:#748196;
   --acc:#3b82f6; --acc2:#22d3ee; --ok:#34d399; --warn:#fbbf24; --mute:#7b8698;
+  --top-bg:rgba(244,247,251,.88);
   --sans:-apple-system,"Segoe UI","Pretendard","Apple SD Gothic Neo","Malgun Gothic",Roboto,sans-serif;
   --serif:"Iropke Batang","Noto Serif KR","Apple SD Gothic Neo","Malgun Gothic",Georgia,serif;
   /* 리더 사용자 설정 (app.js가 localStorage에서 덮어씀) */
   --read-size:1.12rem;
   --read-lh:1.95;
+}
+@media(prefers-color-scheme:dark){:root{
+  color-scheme:dark;
+  --bg:#0c1016; --bg2:#11161f; --card:#161c27; --card2:#1b2230;
+  --line:#252e3d; --line2:#36465e;
+  --tx:#e7ecf3; --tx2:#9aa6b6; --tx3:#6b7689; --top-bg:rgba(12,16,22,.86);
+}}
+:root[data-theme="light"]{
+  color-scheme:light;
+  --bg:#f4f7fb; --bg2:#eaf0f7; --card:#ffffff; --card2:#f7f9fc;
+  --line:#d8e0ea; --line2:#9aabc0;
+  --tx:#182231; --tx2:#526174; --tx3:#748196; --top-bg:rgba(244,247,251,.88);
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0c1016; --bg2:#11161f; --card:#161c27; --card2:#1b2230;
+  --line:#252e3d; --line2:#36465e;
+  --tx:#e7ecf3; --tx2:#9aa6b6; --tx3:#6b7689; --top-bg:rgba(12,16,22,.86);
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
@@ -25,7 +45,7 @@ a{color:inherit;text-decoration:none}
 /* ── 상단바 ── */
 header.top{
   position:sticky; top:0; z-index:20;
-  background:rgba(12,16,22,.86); backdrop-filter:blur(10px);
+  background:var(--top-bg); backdrop-filter:blur(10px);
   border-bottom:1px solid var(--line);
 }
 .top .wrap{display:flex;align-items:center;gap:12px;height:56px}
@@ -50,6 +70,11 @@ header.top{
 .top .gear:hover{border-color:var(--line2);color:var(--tx)}
 .top .gear svg{width:17px;height:17px}
 .top .gear[hidden]{display:none}
+.top .themebtn{
+  flex:0 0 auto;appearance:none;border:1px solid var(--line);background:var(--card);color:var(--tx);
+  font:600 .76rem/1.2 var(--sans);padding:7px 10px;border-radius:999px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;
+}
+.top .themebtn:hover,.top .themebtn:focus-visible{border-color:var(--acc);outline:none}
 
 /* ── 리더 설정 패널 ── */
 .settings{
@@ -193,6 +218,8 @@ footer.site .note{font-size:.72rem;line-height:1.7;max-width:520px;margin:0 auto
   .reader-head h1{font-size:1.32rem}
   .series-card,.detail-head{padding:20px 18px}
   .top .title{font-size:.9rem}
+  .top .themebtn{width:36px;height:36px;padding:0;justify-content:center}
+  .top .themebtn span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
   .detail-head .cta{flex-direction:column}
   .detail-head .cta .btn{width:100%;justify-content:center}
   /* 이전/다음 내비: 좁은 폭에서 회차번호 숨기고 패딩 축소 → 3버튼이 한 줄에 */
@@ -200,3 +227,4 @@ footer.site .note{font-size:.72rem;line-height:1.7;max-width:520px;margin:0 auto
   .epnav a,.epnav span{height:46px;padding:0 13px;font-size:.85rem;gap:6px;min-width:0}
   .epnav .epn{display:none}
 }
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.spinner{animation:none}.settings,.top .home,.top .gear,.stepper button{transition:none}}

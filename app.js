@@ -15,6 +15,26 @@
   var elGear = document.getElementById("gearBtn");
   var elSettings = document.getElementById("settings");
 
+  // 사이트 공통 테마: 시스템 → 라이트 → 다크
+  var THEME_KEY = "plcmanjp-theme";
+  var themeOrder = ["", "light", "dark"];
+  var themeLabel = { "": "시스템", light: "라이트", dark: "다크" };
+  var themeBtn = document.getElementById("themeBtn");
+  var themeOut = document.getElementById("themeLbl");
+  var currentTheme = document.documentElement.getAttribute("data-theme") || "";
+  function applyTheme(theme) {
+    if (theme) document.documentElement.setAttribute("data-theme", theme);
+    else document.documentElement.removeAttribute("data-theme");
+    currentTheme = theme;
+    themeOut.textContent = themeLabel[theme];
+    themeBtn.setAttribute("aria-label", "테마 전환: 현재 " + themeLabel[theme]);
+    try { if (theme) localStorage.setItem(THEME_KEY, theme); else localStorage.removeItem(THEME_KEY); } catch (e) {}
+  }
+  themeBtn.addEventListener("click", function () {
+    applyTheme(themeOrder[(themeOrder.indexOf(currentTheme) + 1) % themeOrder.length]);
+  });
+  applyTheme(currentTheme);
+
   // ── 상태 라벨 ──
   var STATUS = {
     active:    { ko: "연재 중",   cls: "b-active" },
