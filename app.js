@@ -22,18 +22,32 @@
   var themeBtn = document.getElementById("themeBtn");
   var themeOut = document.getElementById("themeLbl");
   var currentTheme = document.documentElement.getAttribute("data-theme") || "";
-  function applyTheme(theme) {
+  function readTheme() {
+    try {
+      var theme = localStorage.getItem(THEME_KEY);
+      return theme === "light" || theme === "dark" ? theme : "";
+    } catch (e) {
+      return document.documentElement.getAttribute("data-theme") || "";
+    }
+  }
+  function applyTheme(theme, save) {
     if (theme) document.documentElement.setAttribute("data-theme", theme);
     else document.documentElement.removeAttribute("data-theme");
     currentTheme = theme;
     themeOut.textContent = themeLabel[theme];
     themeBtn.setAttribute("aria-label", "테마 전환: 현재 " + themeLabel[theme]);
-    try { if (theme) localStorage.setItem(THEME_KEY, theme); else localStorage.removeItem(THEME_KEY); } catch (e) {}
+    if (save !== false) {
+      try { if (theme) localStorage.setItem(THEME_KEY, theme); else localStorage.removeItem(THEME_KEY); } catch (e) {}
+    }
   }
   themeBtn.addEventListener("click", function () {
     applyTheme(themeOrder[(themeOrder.indexOf(currentTheme) + 1) % themeOrder.length]);
   });
-  applyTheme(currentTheme);
+  window.addEventListener("pageshow", function () { applyTheme(readTheme(), false); });
+  window.addEventListener("storage", function (event) {
+    if (event.key === THEME_KEY) applyTheme(event.newValue === "light" || event.newValue === "dark" ? event.newValue : "", false);
+  });
+  applyTheme(currentTheme, false);
 
   // ── 상태 라벨 ──
   var STATUS = {
