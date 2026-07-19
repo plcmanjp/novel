@@ -1,5 +1,5 @@
 /* PLCManJP · AI 웹소설 연재관 — 텍스트 전용 정적 리더
-   시스템/라이트/다크 팔레트. 외부 폰트·프레임워크·이미지 의존 없음. */
+   라이트/다크 팔레트. 외부 폰트·프레임워크·이미지 의존 없음. */
 :root{
   color-scheme:light;
   --bg:#f4f7fb; --bg2:#eaf0f7; --card:#ffffff; --card2:#f7f9fc;
@@ -13,12 +13,6 @@
   --read-size:1.12rem;
   --read-lh:1.95;
 }
-@media(prefers-color-scheme:dark){:root{
-  color-scheme:dark;
-  --bg:#0c1016; --bg2:#11161f; --card:#161c27; --card2:#1b2230;
-  --line:#252e3d; --line2:#36465e;
-  --tx:#e7ecf3; --tx2:#9aa6b6; --tx3:#6b7689; --reader-tx:#dbe2ec; --top-bg:rgba(12,16,22,.86);
-}}
 :root[data-theme="light"]{
   color-scheme:light;
   --bg:#f4f7fb; --bg2:#eaf0f7; --card:#ffffff; --card2:#f7f9fc;

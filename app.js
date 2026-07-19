@@ -15,29 +15,29 @@
   var elGear = document.getElementById("gearBtn");
   var elSettings = document.getElementById("settings");
 
-  // 사이트 공통 테마: 시스템 → 라이트 → 다크
+  // 사이트 공통 테마: 라이트 ↔ 다크
   var THEME_KEY = "plcmanjp-theme";
-  var themeOrder = ["", "light", "dark"];
-  var themeLabel = { "": "시스템", light: "라이트", dark: "다크" };
+  var themeOrder = ["light", "dark"];
+  var themeLabel = { light: "라이트", dark: "다크" };
   var themeBtn = document.getElementById("themeBtn");
   var themeOut = document.getElementById("themeLbl");
-  var currentTheme = document.documentElement.getAttribute("data-theme") || "";
+  var currentTheme = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
   function readTheme() {
     try {
       var theme = localStorage.getItem(THEME_KEY);
-      return theme === "light" || theme === "dark" ? theme : "";
+      return theme === "dark" ? "dark" : "light";
     } catch (e) {
-      return document.documentElement.getAttribute("data-theme") || "";
+      return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
     }
   }
   function applyTheme(theme, save) {
-    if (theme) document.documentElement.setAttribute("data-theme", theme);
-    else document.documentElement.removeAttribute("data-theme");
+    theme = theme === "dark" ? "dark" : "light";
+    document.documentElement.setAttribute("data-theme", theme);
     currentTheme = theme;
     themeOut.textContent = themeLabel[theme];
     themeBtn.setAttribute("aria-label", "테마 전환: 현재 " + themeLabel[theme]);
     if (save !== false) {
-      try { if (theme) localStorage.setItem(THEME_KEY, theme); else localStorage.removeItem(THEME_KEY); } catch (e) {}
+      try { localStorage.setItem(THEME_KEY, theme); } catch (e) {}
     }
   }
   themeBtn.addEventListener("click", function () {
@@ -45,7 +45,7 @@
   });
   window.addEventListener("pageshow", function () { applyTheme(readTheme(), false); });
   window.addEventListener("storage", function (event) {
-    if (event.key === THEME_KEY) applyTheme(event.newValue === "light" || event.newValue === "dark" ? event.newValue : "", false);
+    if (event.key === THEME_KEY) applyTheme(event.newValue === "dark" ? "dark" : "light", false);
   });
   applyTheme(currentTheme, false);
 
