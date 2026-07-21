@@ -292,6 +292,7 @@
   // ── 뷰: 회차 리더 ──
   function renderEpisode(seriesId, epNo) {
     elGear.hidden = false;
+    closeSettings();
     setNavTitle("AI 웹소설 연재관");
     showLoading("회차를 불러오는 중…");
     // meta + episode 병렬 로드 (이전/다음 계산에 meta 필요)
@@ -437,8 +438,14 @@
     reset.addEventListener("click", function () { settings = { size: 3, lh: 3 }; applySettings(); saveSettings(); refresh(); });
     refresh();
   }
-  function closeSettings() { elSettings.classList.remove("open"); }
-  elGear.addEventListener("click", function () { elSettings.classList.toggle("open"); });
+  function closeSettings() {
+    elSettings.classList.remove("open");
+    elGear.setAttribute("aria-expanded", "false");
+  }
+  elGear.addEventListener("click", function () {
+    var isOpen = elSettings.classList.toggle("open");
+    elGear.setAttribute("aria-expanded", String(isOpen));
+  });
 
   // ── 라우터 ──
   function parseHash() {

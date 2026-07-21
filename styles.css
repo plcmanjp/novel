@@ -7,6 +7,8 @@
   --tx:#182231; --tx2:#526174; --tx3:#748196; --reader-tx:#263445;
   --acc:#3b82f6; --acc2:#22d3ee; --ok:#34d399; --warn:#fbbf24; --mute:#7b8698;
   --top-bg:rgba(244,247,251,.88);
+  --top-height:56px;
+  --shadow:0 8px 24px rgba(24,34,49,.08);
   --sans:-apple-system,"Segoe UI","Pretendard","Apple SD Gothic Neo","Malgun Gothic",Roboto,sans-serif;
   --serif:"Iropke Batang","Noto Serif KR","Apple SD Gothic Neo","Malgun Gothic",Georgia,serif;
   /* 리더 사용자 설정 (app.js가 localStorage에서 덮어씀) */
@@ -18,12 +20,14 @@
   --bg:#f4f7fb; --bg2:#eaf0f7; --card:#ffffff; --card2:#f7f9fc;
   --line:#d8e0ea; --line2:#9aabc0;
   --tx:#182231; --tx2:#526174; --tx3:#748196; --reader-tx:#263445; --top-bg:rgba(244,247,251,.88);
+  --shadow:0 8px 24px rgba(24,34,49,.08);
 }
 :root[data-theme="dark"]{
   color-scheme:dark;
   --bg:#0c1016; --bg2:#11161f; --card:#161c27; --card2:#1b2230;
   --line:#252e3d; --line2:#36465e;
   --tx:#e7ecf3; --tx2:#9aa6b6; --tx3:#6b7689; --reader-tx:#dbe2ec; --top-bg:rgba(12,16,22,.86);
+  --shadow:0 8px 24px rgba(0,0,0,.36);
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
@@ -72,10 +76,21 @@ header.top{
 
 /* ── 리더 설정 패널 ── */
 .settings{
-  border-bottom:1px solid var(--line);background:var(--bg2);
-  overflow:hidden;max-height:0;transition:max-height .25s ease;
+  position:fixed;
+  top:var(--top-height);
+  left:0; right:0;
+  z-index:19;
+  border-bottom:1px solid var(--line);
+  background:var(--bg2);
+  overflow:hidden;
+  max-height:0;
+  transition:max-height .25s ease, box-shadow .25s ease;
+  box-shadow:none;
 }
-.settings.open{max-height:260px}
+.settings.open{
+  max-height:260px;
+  box-shadow:var(--shadow);
+}
 .settings .wrap{padding:0 20px}
 .settings.open .wrap{padding:18px 20px}
 .set-row{display:flex;align-items:center;gap:14px;margin:0 0 14px}
@@ -220,5 +235,11 @@ footer.site .note{font-size:.72rem;line-height:1.7;max-width:520px;margin:0 auto
   .epnav{gap:8px}
   .epnav > a,.epnav > span{height:46px;padding:0 13px;font-size:.85rem;gap:6px}
   .epnav .epn{display:none}
+  /* 모바일 설정 패널 최적화 */
+  .set-row{gap:8px}
+  .set-row .lbl{flex:0 0 68px}
+  .stepper{gap:6px}
+  .stepper .val{min-width:48px}
+  .set-reset{padding:6px 10px}
 }
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.spinner{animation:none}.settings,.top .home,.top .gear,.stepper button{transition:none}}
