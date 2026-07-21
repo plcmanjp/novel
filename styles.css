@@ -80,15 +80,16 @@ header.top{
   top:var(--top-height);
   left:0; right:0;
   z-index:19;
-  border-bottom:1px solid var(--line);
+  border-bottom:0;
   background:var(--bg2);
   overflow:hidden;
   max-height:0;
-  transition:max-height .25s ease, box-shadow .25s ease;
+  transition:max-height .25s ease, box-shadow .25s ease, border-bottom .25s ease;
   box-shadow:none;
 }
 .settings.open{
   max-height:260px;
+  border-bottom:1px solid var(--line);
   box-shadow:var(--shadow);
 }
 .settings .wrap{padding:0 20px}

@@ -438,13 +438,27 @@
     reset.addEventListener("click", function () { settings = { size: 3, lh: 3 }; applySettings(); saveSettings(); refresh(); });
     refresh();
   }
+  function openSettings() {
+    elSettings.classList.add("open");
+    elSettings.removeAttribute("inert");
+    elSettings.setAttribute("aria-hidden", "false");
+    elGear.setAttribute("aria-expanded", "true");
+  }
   function closeSettings() {
+    if (elSettings.contains(document.activeElement)) {
+      elGear.focus();
+    }
     elSettings.classList.remove("open");
+    elSettings.setAttribute("inert", "");
+    elSettings.setAttribute("aria-hidden", "true");
     elGear.setAttribute("aria-expanded", "false");
   }
   elGear.addEventListener("click", function () {
-    var isOpen = elSettings.classList.toggle("open");
-    elGear.setAttribute("aria-expanded", String(isOpen));
+    if (elSettings.classList.contains("open")) {
+      closeSettings();
+    } else {
+      openSettings();
+    }
   });
 
   // ── 라우터 ──
