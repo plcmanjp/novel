@@ -22,13 +22,13 @@
   var themeBtn = document.getElementById("themeBtn");
   var themeOut = document.getElementById("themeLbl");
   var currentTheme = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+  var themeMeta = document.getElementById("themeColor");
   function readTheme() {
     try {
       var theme = localStorage.getItem(THEME_KEY);
-      return theme === "dark" ? "dark" : "light";
-    } catch (e) {
-      return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
-    }
+      if (theme === "dark" || theme === "light") return theme;
+    } catch (e) {}
+    return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
   }
   function applyTheme(theme, save) {
     theme = theme === "dark" ? "dark" : "light";
@@ -36,6 +36,7 @@
     currentTheme = theme;
     themeOut.textContent = themeLabel[theme];
     themeBtn.setAttribute("aria-label", "테마 전환: 현재 " + themeLabel[theme]);
+    if (themeMeta) themeMeta.setAttribute("content", theme === "dark" ? "#0c1016" : "#f4f7fb");
     if (save !== false) {
       try { localStorage.setItem(THEME_KEY, theme); } catch (e) {}
     }
