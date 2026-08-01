@@ -310,7 +310,7 @@
       var prev = pos > 0 ? eps[pos - 1] : null;
       var next = (pos >= 0 && pos < eps.length - 1) ? eps[pos + 1] : null;
 
-      setNavTitle(seriesTitle(m) || seriesId, "· " + epNo + "화");
+      setNavTitle(seriesTitle(m) || seriesId, "/ " + epNo + "화");
 
       // breadcrumb
       var cb = el("div", "crumb");
@@ -323,7 +323,7 @@
 
       // reader head
       var rh = el("div", "reader-head");
-      var seasonTxt = (ep.season != null ? ("시즌 " + ep.season + " · ") : "");
+      var seasonTxt = (ep.season != null ? ("시즌 " + ep.season + " / ") : "");
       rh.appendChild(el("div", "epno", seasonTxt + epNo + "화"));
       rh.appendChild(el("h1", null, ep.title || "무제"));
       var rm = el("div", "rmeta");
