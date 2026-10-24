@@ -95,6 +95,64 @@ test('genuine downward movement to actual reader end marks only that chapter, id
   assert.equal(env.one('.reader-body').children.map(node => node.textContent).join('|'), '첫 문단같은 문단의 다음 줄|둘째 문단|셋째 문단|마지막 문단');
 });
 
+test('programmatic downward scrolling saves position but cannot manufacture reading completion', async () => {
+  const env = await ready(make());
+  await env.scroll(800, { input: false }); await env.frames(2); await env.advance(350);
+  assert.deepEqual(record(env).completed, []);
+  assert.ok(record(env).last.position.ratio > 0, 'scroll position still remains resumable');
+  env.event(env.document, 'keydown', { key: 'End', isTrusted: true }); await env.frames(2);
+  assert.deepEqual(record(env).completed, [43], 'a deliberate reading key can confirm the visible text ending');
+});
+
+test('a reading gesture expires before a later unrelated programmatic scroll', async () => {
+  const env = await ready(make());
+  await env.scroll(400); await env.frames(2);
+  assert.deepEqual(record(env).completed, []);
+  await env.advance(1201);
+  await env.scroll(800, { input: false }); await env.frames(2);
+  assert.deepEqual(record(env).completed, []);
+  env.event(env.document.body, 'wheel', { deltaY: 20, isTrusted: true }); await env.frames(2);
+  assert.deepEqual(record(env).completed, [43], 'a fresh trusted wheel gesture still works');
+});
+
+test('Tab focus navigation clears an earlier reading gesture before automatic focus scroll', async () => {
+  const env = await ready(make());
+  await env.scroll(400); await env.frames(2);
+  env.event(env.document, 'keydown', { key: 'Tab', isTrusted: true });
+  await env.scroll(800, { input: false }); await env.frames(2);
+  assert.deepEqual(record(env).completed, []);
+});
+
+test('interactive pointer navigation clears an earlier reading gesture before offscreen link auto-scroll', async () => {
+  const env = await ready(make());
+  await env.scroll(400); await env.frames(2);
+  env.event(env.one('.epnav .toc'), 'pointerdown', { clientX: 200, clientY: 790, isTrusted: true });
+  await env.scroll(800, { input: false }); await env.frames(2);
+  assert.deepEqual(record(env).completed, []);
+  assert.equal(env.location.hash, '#/s/ash-blade/43');
+});
+
+test('untrusted wheel events cannot arm completion for subsequent automatic scroll', async () => {
+  const env = await ready(make());
+  env.event(env.document.body, 'wheel', { deltaY: 20, isTrusted: false });
+  await env.scroll(800, { input: false }); await env.frames(2);
+  assert.deepEqual(record(env).completed, []);
+});
+
+test('root scrollbar dragging can arm and refresh genuine reading intent, unlike ordinary root clicks', async () => {
+  const env = await ready(make());
+  env.document.documentElement.clientWidth = 980;
+  env.event(env.document.documentElement, 'pointerdown', { clientX: 400, clientY: 300, buttons: 1, button: 0, isTrusted: true });
+  await env.scroll(800, { input: false }); await env.frames(2);
+  assert.deepEqual(record(env).completed, []);
+  env.event(env.document.documentElement, 'pointerdown', { clientX: 990, clientY: 300, buttons: 1, button: 0, isTrusted: true });
+  await env.advance(1201);
+  env.event(env.document.documentElement, 'pointermove', { clientX: 990, clientY: 650, buttons: 1, isTrusted: true });
+  await env.scroll(810, { input: false }); await env.frames(2);
+  assert.deepEqual(record(env).completed, [43]);
+  env.event(env.document.documentElement, 'pointerup', { buttons: 0, isTrusted: true });
+});
+
 for (const hiddenMode of ['hidden', 'unfocused', 'prerender']) {
   test(hiddenMode + ' reader cannot earn completion; a fresh visible input can', async () => {
     const env = await ready(make());
@@ -149,6 +207,16 @@ test('a matched reload restores its paragraph anchor without completing; another
   assert.equal(env.window.scrollY, 0);
   assert.equal(record(env).last.episode, 45);
   assert.deepEqual(record(env).completed, []);
+});
+
+test('a saved partial header/preface scroll restores without jumping to the first paragraph', async () => {
+  const env = await ready(make());
+  await env.scroll(180); await env.frames(2); await env.advance(350);
+  const saved = record(env).last.position;
+  assert.equal(saved.ratio, 0); assert.equal(saved.offset, 0.6);
+  const restored = await ready(make({ now: 2000000, storage: Object.fromEntries(env.local) }));
+  assert.equal(restored.window.scrollY, 180);
+  assert.deepEqual(record(restored).completed, []);
 });
 
 test('explicit resume link carries only the selected published chapter anchor', async () => {

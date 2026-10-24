@@ -200,7 +200,7 @@
     if (reader.notice.textContent !== notice) reader.notice.textContent = notice;
   }
   function checkCompletion(reader) {
-    if (!visibleReader(reader) || !reader.ready || !reader.started || !reader.intent || elSettings.classList.contains("open")) return;
+    if (!visibleReader(reader) || !reader.ready || !reader.started || !reader.intent || Date.now() > reader.intentUntil || elSettings.classList.contains("open")) return;
     if (typeof document.hasFocus === "function" && !document.hasFocus()) return;
     var last = reader.body.lastElementChild || reader.body.children[reader.body.children.length - 1];
     if (!last || !reader.hasText) return;
@@ -216,7 +216,7 @@
     var state = progressStore.get(sid, eps);
     var resume = pendingResume && pendingResume.series === sid && pendingResume.episode === epNo ? pendingResume.position : (state.last && state.last.episode === epNo ? state.last.position : null);
     pendingResume = null;
-    var reader = { series: sid, episode: epNo, eps: eps, body: body, hasText: hasText, token: token, epoch: state.epoch, stamp: { at: Date.now(), id: tabId + "-" + (++openSequence) }, layoutRevision: 0, ready: false, started: false, intent: false, suspended: false, status: status, notice: notice, saveTimer: null };
+    var reader = { series: sid, episode: epNo, eps: eps, body: body, hasText: hasText, token: token, epoch: state.epoch, stamp: { at: Date.now(), id: tabId + "-" + (++openSequence) }, layoutRevision: 0, ready: false, started: false, intent: false, intentUntil: 0, scrollbarActive: false, suspended: false, status: status, notice: notice, saveTimer: null };
     activeReader = reader;
     progressViews.push(function () { readerStatus(reader); });
     function activate() {
@@ -236,19 +236,31 @@
     var reader = activeReader;
     if (!visibleReader(reader) || !reader.ready || !reader.started || event.isTrusted === false || elSettings.classList.contains("open")) return;
     if (event.type === "keydown") {
-      if (["ArrowDown", "PageDown", "End", " "].indexOf(event.key) < 0 || /^(BUTTON|INPUT|TEXTAREA|SELECT|A)$/.test((event.target && event.target.tagName) || "")) return;
+      if (["ArrowDown", "PageDown", "End", " "].indexOf(event.key) < 0 || /^(BUTTON|INPUT|TEXTAREA|SELECT|A)$/.test((event.target && event.target.tagName) || "")) { reader.intent = false; return; }
     } else if (event.type === "wheel" && !(event.deltaY > 0)) return;
-    reader.intent = true;
+    reader.intent = true; reader.intentUntil = Date.now() + 1200;
     window.requestAnimationFrame(function () { checkCompletion(reader); });
   }
   window.addEventListener("wheel", readingInput, { passive: true });
   window.addEventListener("touchmove", readingInput, { passive: true });
   document.addEventListener("keydown", readingInput);
+  window.addEventListener("pointerdown", function (event) {
+    var reader = activeReader;
+    if (!visibleReader(reader) || !reader.ready || event.isTrusted === false) return;
+    // Focus/scrollIntoView and script-driven scrolling are not reading gestures.
+    reader.intent = false;
+    reader.scrollbarActive = event.target === document.documentElement && event.clientX >= document.documentElement.clientWidth;
+    if (reader.scrollbarActive) { reader.intent = true; reader.intentUntil = Date.now() + 1200; }
+  }, { passive: true });
+  window.addEventListener("pointermove", function (event) {
+    var reader = activeReader;
+    if (reader && reader.scrollbarActive && event.buttons === 1 && event.isTrusted !== false) reader.intentUntil = Date.now() + 1200;
+  }, { passive: true });
+  window.addEventListener("pointerup", function () { if (activeReader) activeReader.scrollbarActive = false; }, { passive: true });
   window.addEventListener("scroll", function () {
     var reader = activeReader;
     if (!visibleReader(reader) || !reader.ready || !reader.started) return;
     var y = window.scrollY || 0;
-    if (y > reader.lastY + 1) reader.intent = true;
     reader.lastY = y;
     checkCompletion(reader);
     if (!reader.saveTimer) reader.saveTimer = setTimeout(function () { reader.saveTimer = null; saveReader(reader); }, 350);
