@@ -50,6 +50,9 @@ test('opening a published chapter records last opened only after ready, never co
   assert.equal(record(env).last.position.ratio, 0);
   assert.deepEqual(record(env).completed, []);
   assert.ok(env.one('.reader-progress').textContent.includes('본문 끝'));
+  assert.ok(env.one('.reader-progress').textContent.includes('화면에 보이면'));
+  assert.ok(env.one('.reader-progress').textContent.includes('열기·위치 복원만으로는 표시하지 않습니다'));
+  assert.ok(!env.one('.reader-progress').textContent.includes('End'), 'native End can land beyond the text at the footer, so guidance must not promise it confirms reading');
   assert.ok(env.one('.reader-local-note').textContent.includes('서버로 보내지 않습니다'));
 });
 
@@ -281,6 +284,33 @@ test('font changes retain a paragraph anchor without adding a completion mark', 
   env.byId('gearBtn').click(); env.button('글자 크게').click(); await env.frames(5);
   assert.equal(env.window.scrollY, 600); assert.deepEqual(record(env).last.position, saved);
   assert.deepEqual(record(env).completed, []);
+});
+
+test('opening, closing and escaping fixed reader settings move focus without scrolling the reading page', async () => {
+  const env = await ready(make());
+  const gear = env.byId('gearBtn');
+  const close = env.one('.settings-close');
+  const calls = [];
+  for (const [name, node] of [['settings-close', close], ['gear', gear]]) {
+    const focus = node.focus;
+    node.focus = function (options) { calls.push({ name, options }); return focus.call(this, options); };
+  }
+  // Dispatch handlers directly: Node.click's initial focus models the user's
+  // click, whereas this check concerns the app's programmatic focus calls.
+  env.event(gear, 'click');
+  assert.equal(env.document.activeElement, close);
+  assert.deepEqual(json(calls), [{ name: 'settings-close', options: { preventScroll: true } }]);
+  calls.length = 0;
+  env.event(close, 'click');
+  assert.equal(env.document.activeElement, gear);
+  assert.ok(calls.length > 0);
+  assert.ok(calls.every(call => call.name === 'gear' && call.options?.preventScroll === true));
+  env.event(gear, 'click');
+  calls.length = 0;
+  env.event(env.document, 'keydown', { key: 'Escape', isTrusted: true });
+  assert.equal(env.document.activeElement, gear);
+  assert.ok(calls.length > 0);
+  assert.ok(calls.every(call => call.name === 'gear' && call.options?.preventScroll === true));
 });
 
 test('published gaps filter library summaries, resume links and TOC badges without rewriting disk', async () => {
