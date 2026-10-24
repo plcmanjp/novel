@@ -191,11 +191,13 @@
     activeReader = null;
   }
   function readerStatus(reader) {
-    if (!ownsReader(reader)) return;
+    if (!reader || activeReader !== reader || reader.token !== renderToken || !reader.body.isConnected) return;
     var state = progressStore.get(reader.series, reader.eps);
     var read = state.completed.indexOf(reader.episode) >= 0;
-    reader.status.textContent = reader.suspended ? "다른 탭에서 기록을 지웠습니다. 회차를 다시 열면 새로 기록합니다." : (read ? "이 회차 읽음 · 본문 끝 도달 기준" : "본문 끝까지 이동하면 읽음으로 표시됩니다. 짧은 회차도 아래로 스크롤하거나 End 키로 확인해 주세요.");
-    reader.notice.textContent = storageMessage(state);
+    var message = reader.suspended ? "다른 탭에서 기록을 지웠습니다. 회차를 다시 열면 새로 기록합니다." : (read ? "이 회차 읽음 · 본문 끝 도달 기준" : "본문 끝까지 이동하면 읽음으로 표시됩니다. 짧은 회차도 아래로 스크롤하거나 End 키로 확인해 주세요.");
+    if (reader.status.textContent !== message) reader.status.textContent = message;
+    var notice = storageMessage(state);
+    if (reader.notice.textContent !== notice) reader.notice.textContent = notice;
   }
   function checkCompletion(reader) {
     if (!visibleReader(reader) || !reader.ready || !reader.started || !reader.intent || elSettings.classList.contains("open")) return;
@@ -263,18 +265,21 @@
     else { reader.intent = false; reader.lastY = window.scrollY || 0; }
   });
   window.addEventListener("pageshow", function (event) {
-    if (event.persisted && activeReader) {
+    if (!event.persisted) return;
+    if (activeReader) {
       var reader = activeReader, state = progressStore.reload(reader.series);
-      if (state.epoch !== reader.epoch) { reader.suspended = true; reader.ready = false; }
-      else if (!reader.started) reader.activate();
+      if (state.epoch !== reader.epoch || (reader.started && !state.last)) {
+        reader.suspended = true; reader.ready = false; reader.layoutRevision++;
+        clearTimeout(reader.saveTimer); reader.saveTimer = null;
+      } else if (!reader.started) reader.activate();
       reader.intent = false;
-      refreshProgressViews();
     }
+    refreshProgressViews();
   });
   window.addEventListener("storage", function (event) {
     var sid = progressStore.idForKey(event.key);
     if (!sid && event.key !== null) return;
-    if (sid) progressStore.reload(sid);
+    if (sid) progressStore.reload(sid, event.newValue);
     var reader = activeReader;
     if (reader && (!sid || sid === reader.series)) {
       var state = progressStore.reload(reader.series);
@@ -319,6 +324,7 @@
   function applySettings() {
     var reader = activeReader;
     var anchor = reader && reader.ready ? capturePosition(reader) : null;
+    if (anchor) saveReader(reader);
     var root = document.documentElement.style;
     root.setProperty("--read-size", SIZE_STEPS[settings.size] + "rem");
     root.setProperty("--read-lh", String(LH_STEPS[settings.lh]));

@@ -1,4 +1,4 @@
-/* Browser-only reading history. No requests, cookies, accounts, or synchronization. */
+/* Browser-only reading history. No requests, cookies, accounts, or cross-device synchronization. */
 (function (root) {
   "use strict";
   var PREFIX = "plcmanjp-novel-progress-v1:";
@@ -9,6 +9,21 @@
   function validId(id) { return typeof id === "string" && /^[a-z0-9][a-z0-9_-]{0,79}$/i.test(id); }
   function validEpisode(n) { return Number.isSafeInteger(n) && n > 0; }
   function validTime(n) { return Number.isSafeInteger(n) && n >= 0 && n < Number.MAX_SAFE_INTEGER; }
+  function epochTime(epoch) {
+    if (epoch === "0") return 0;
+    if (typeof epoch !== "string") return null;
+    var parts = /^([a-z0-9]{1,11})-([a-z0-9]{1,12})-([a-z0-9]{1,20})$/.exec(epoch);
+    if (!parts) return null;
+    var time = parseInt(parts[1], 36);
+    return validTime(time) && time.toString(36) === parts[1] ? time : null;
+  }
+  function compareEpoch(a, b) {
+    if (a === b) return 0;
+    if (a === "0") return -1;
+    if (b === "0") return 1;
+    var difference = epochTime(a) - epochTime(b);
+    return difference || (a < b ? -1 : 1);
+  }
   function validStamp(stamp) { return stamp && validTime(stamp.at) && typeof stamp.id === "string" && /^[a-z0-9_-]{1,80}$/i.test(stamp.id); }
   function compareLast(a, b) {
     if (a.openedAt !== b.openedAt) return a.openedAt - b.openedAt;
@@ -33,7 +48,7 @@
     var value;
     try { value = JSON.parse(raw); } catch (error) { return null; }
     if (!value || typeof value !== "object" || value.version !== 1 || typeof value.epoch !== "string" ||
-        !/^(0|[a-z0-9-]{1,100})$/i.test(value.epoch) || !Array.isArray(value.completed) || value.completed.length > MAX_EPISODES) return null;
+        epochTime(value.epoch) === null || !Array.isArray(value.completed) || value.completed.length > MAX_EPISODES) return null;
     if (!value.completed.every(validEpisode)) return null;
     if (value.last !== null && (!value.last || typeof value.last !== "object" || !validEpisode(value.last.episode) ||
         !validPosition(value.last.position) || !validTime(value.last.updatedAt) ||
@@ -64,7 +79,7 @@
     var now = typeof options.now === "function" ? options.now : Date.now;
     function storage() { return Object.prototype.hasOwnProperty.call(options, "storage") ? options.storage : root.localStorage; }
     function entry(id) {
-      if (!cache[id]) cache[id] = { record: blank(), status: "saved", dirty: false, rawSeen: null, pendingResetFrom: null };
+      if (!cache[id]) cache[id] = { record: blank(), status: "saved", dirty: false, rawSeen: null, pendingResetFrom: null, readAllowed: false };
       return cache[id];
     }
     function read(id) {
@@ -73,7 +88,8 @@
         var target = storage();
         if (!target) throw new Error("Storage unavailable");
         raw = target.getItem(keyFor(id));
-      } catch (error) { state.status = "memory"; return state; }
+      } catch (error) { state.status = "memory"; state.readAllowed = false; return state; }
+      state.readAllowed = true;
       // Keep an unsaved in-memory update while disk still contains the bytes it
       // was based on. A changed epoch from another tab always wins over it.
       if (state.dirty && raw === state.rawSeen) return state;
@@ -84,8 +100,10 @@
       }
       var incoming = parse(raw);
       if (!incoming) { state.status = "corrupt"; state.rawSeen = raw; return state; }
-      if (state.dirty && state.pendingResetFrom === incoming.epoch) {
-        state.rawSeen = raw; state.status = "memory"; return state;
+      // An old process may finish writing bytes it read before a reset. Reset
+      // epochs are monotonic; never let those bytes resurrect cleared history.
+      if (compareEpoch(incoming.epoch, state.record.epoch) < 0) {
+        state.rawSeen = raw; state.dirty = true; state.status = "memory"; return state;
       }
       var sameEpoch = incoming.epoch === state.record.epoch;
       state.record = sameEpoch ? merge(state.record, incoming) : incoming;
@@ -115,7 +133,7 @@
       var blocked = state.status === "corrupt" && !allowCorrupt;
       state.record = record;
       state.dirty = true;
-      if (blocked) { changed(id); return true; }
+      if (blocked || (!state.readAllowed && !allowCorrupt)) { changed(id); return true; }
       try {
         var target = storage();
         if (!target) throw new Error("Storage unavailable");
@@ -169,11 +187,24 @@
         var timestamp = now();
         if (!validTime(timestamp)) return false;
         var state = read(id); state.pendingResetFrom = state.record.epoch;
-        var epoch = timestamp.toString(36) + "-" + (++sequence).toString(36) + "-" + Math.random().toString(36).slice(2, 14);
+        timestamp = Math.max(timestamp, epochTime(state.record.epoch) + 1);
+        if (!validTime(timestamp)) return false;
+        var epoch = timestamp.toString(36) + "-" + (++sequence).toString(36) + "-" + (Math.random().toString(36).slice(2, 14) || "0");
         return write(id, blank(epoch), true);
       },
-      reload: function (id) {
+      reload: function (id, observedRaw) {
         if (!validId(id)) return null;
+        // storage events carry the written bytes, not a promise that disk still
+        // contains them. Remember a validated newer reset even if its writer
+        // closes before a stale process overwrites the shared key.
+        if (typeof observedRaw === "string") {
+          var observed = parse(observedRaw), cached = entry(id);
+          if (observed && compareEpoch(observed.epoch, cached.record.epoch) >= 0) {
+            cached.record = observed.epoch === cached.record.epoch ? merge(cached.record, observed) : observed;
+            cached.dirty = JSON.stringify(cached.record) !== JSON.stringify(observed);
+            cached.rawSeen = observedRaw; cached.pendingResetFrom = null;
+          }
+        }
         var state = read(id);
         if (state.dirty && state.status !== "corrupt") write(id, copy(state.record), false);
         else changed(id);

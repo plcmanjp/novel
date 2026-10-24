@@ -206,3 +206,82 @@ test('failed clear remains authoritative over another old-generation tab save', 
   assert.deepEqual(json(b.reload('ash-blade').completed), []);
   assert.equal(b.get('ash-blade').epoch, resetEpoch);
 });
+
+
+test('successful clear survives delayed pre-reset bytes and rewrites newer tombstone', () => {
+  const disk = storage(), a = make(disk).store, b = make(disk).store;
+  a.complete('ash-blade', 1); a.updateLast('ash-blade', 1, POSITION, '0', { at: 5, id: 'old-reader' });
+  const stale = disk.values.get(a.keyFor('ash-blade'));
+  b.get('ash-blade'); b.clear('ash-blade'); const reset = b.get('ash-blade');
+  disk.values.set(a.keyFor('ash-blade'), stale); // Already-read old process finishes after reset.
+  const restored = b.reload('ash-blade');
+  assert.equal(restored.epoch, reset.epoch); assert.equal(restored.last, null);
+  assert.deepEqual(json(restored.completed), []);
+  assert.equal(JSON.parse(disk.values.get(a.keyFor('ash-blade'))).epoch, reset.epoch);
+  assert.equal(a.complete('ash-blade', 5, '0'), false);
+  assert.equal(a.updateLast('ash-blade', 1, POSITION, '0', { at: 5, id: 'old-reader' }), false);
+});
+
+test('monotonic reset timestamps survive backward clocks and multiple clears', () => {
+  const disk = storage(); let clock = 1000;
+  const { store } = make(disk, { now: () => clock });
+  store.complete('ash-blade', 1); store.clear('ash-blade'); const first = store.get('ash-blade').epoch;
+  clock = 1; store.clear('ash-blade'); const second = store.get('ash-blade').epoch;
+  assert.equal(parseInt(second.split('-')[0], 36), parseInt(first.split('-')[0], 36) + 1);
+  const secondBytes = disk.values.get(store.keyFor('ash-blade'));
+  disk.values.set(store.keyFor('ash-blade'), JSON.stringify({ version: 1, epoch: first, last: null, completed: [2] }));
+  store.reload('ash-blade'); assert.equal(disk.values.get(store.keyFor('ash-blade')), secondBytes);
+  assert.deepEqual(json(store.get('ash-blade').completed), []);
+});
+
+test('simultaneous reset epochs converge deterministically by full-id tie break', () => {
+  const disk = storage(), a = make(disk).store, b = make(disk).store;
+  const key = a.keyFor('ash-blade');
+  const lower = { version: 1, epoch: 'rs-1-aaaa', last: null, completed: [] };
+  const higher = { version: 1, epoch: 'rs-1-zzzz', last: null, completed: [] };
+  disk.values.set(key, JSON.stringify(lower)); a.get('ash-blade');
+  disk.values.set(key, JSON.stringify(higher)); b.get('ash-blade');
+  disk.values.set(key, JSON.stringify(lower)); // Lower winner arrives late.
+  b.reload('ash-blade'); a.reload('ash-blade');
+  assert.equal(a.get('ash-blade').epoch, higher.epoch); assert.equal(b.get('ash-blade').epoch, higher.epoch);
+  const count = disk.writes.length; b.reload('ash-blade'); a.reload('ash-blade');
+  assert.equal(disk.writes.length, count);
+});
+
+test('read failure cannot clobber unseen existing bytes even if setItem is allowed', () => {
+  const disk = storage(); const source = make(disk).store;
+  source.complete('ash-blade', 45); source.updateLast('ash-blade', 45, POSITION, '0', { at: 2000, id: 'newer' });
+  const key = source.keyFor('ash-blade'), original = disk.values.get(key);
+  disk.readError = true; const { store } = make(disk);
+  store.complete('ash-blade', 1); store.updateLast('ash-blade', 1, POSITION, '0', { at: 1000, id: 'old' });
+  assert.equal(disk.values.get(key), original); assert.equal(store.status('ash-blade'), 'memory');
+  disk.readError = false; store.reload('ash-blade');
+  assert.deepEqual(json(store.get('ash-blade').completed), [1, 45]);
+  assert.equal(last(store).episode, 45); assert.equal(store.status('ash-blade'), 'saved');
+});
+
+
+test('validated storage-event reset payload survives resetter closing before stale disk overwrite', () => {
+  const disk = storage(), resetter = make(disk).store, receiver = make(disk).store;
+  resetter.complete('ash-blade', 1); const key = resetter.keyFor('ash-blade');
+  const oldBytes = disk.values.get(key); receiver.get('ash-blade');
+  resetter.clear('ash-blade'); const resetBytes = disk.values.get(key);
+  const resetEpoch = JSON.parse(resetBytes).epoch;
+  disk.values.set(key, oldBytes); // Resetter is now unavailable; event is receiver's only reset evidence.
+  const state = receiver.reload('ash-blade', resetBytes);
+  assert.equal(state.epoch, resetEpoch); assert.deepEqual(json(state.completed), []); assert.equal(state.last, null);
+  assert.equal(JSON.parse(disk.values.get(key)).epoch, resetEpoch);
+  assert.equal(receiver.complete('ash-blade', 5, '0'), false);
+});
+
+test('reload ignores corrupt or deleted event payloads and unions valid same-epoch event marks', () => {
+  const disk = storage(), { store } = make(disk); store.complete('ash-blade', 1);
+  const key = store.keyFor('ash-blade'), original = disk.values.get(key);
+  store.reload('ash-blade', '{bad'); store.reload('ash-blade', null);
+  assert.equal(disk.values.get(key), original);
+  store.reload('ash-blade', JSON.stringify({ version: 1, epoch: '0', last: null, completed: [45] }));
+  assert.deepEqual(json(store.get('ash-blade').completed), [1, 45]);
+  assert.deepEqual(JSON.parse(disk.values.get(key)).completed, [1, 45]);
+  const writes = disk.writes.length; store.reload('ash-blade', disk.values.get(key));
+  assert.equal(disk.writes.length, writes);
+});
