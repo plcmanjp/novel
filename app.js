@@ -14,6 +14,7 @@
   var elTitle = document.getElementById("navTitle");
   var elGear = document.getElementById("gearBtn");
   var elSettings = document.getElementById("settings");
+  var renderToken = 0;
 
   // 사이트 공통 테마: 라이트 ↔ 다크
   var THEME_KEY = "plcmanjp-theme";
@@ -36,7 +37,7 @@
     currentTheme = theme;
     themeOut.textContent = themeLabel[theme];
     themeBtn.setAttribute("aria-label", "테마 전환: 현재 " + themeLabel[theme]);
-    if (themeMeta) themeMeta.setAttribute("content", theme === "dark" ? "#0c1016" : "#f4f7fb");
+    if (themeMeta) themeMeta.setAttribute("content", theme === "dark" ? "#181a19" : "#faf9f6");
     if (save !== false) {
       try { localStorage.setItem(THEME_KEY, theme); } catch (e) {}
     }
@@ -71,8 +72,8 @@
       var raw = localStorage.getItem(LS_KEY);
       if (!raw) return def;
       var o = JSON.parse(raw);
-      var s = (typeof o.size === "number" && o.size >= 0 && o.size < SIZE_STEPS.length) ? o.size : def.size;
-      var l = (typeof o.lh === "number" && o.lh >= 0 && o.lh < LH_STEPS.length) ? o.lh : def.lh;
+      var s = (Number.isInteger(o.size) && o.size >= 0 && o.size < SIZE_STEPS.length) ? o.size : def.size;
+      var l = (Number.isInteger(o.lh) && o.lh >= 0 && o.lh < LH_STEPS.length) ? o.lh : def.lh;
       return { size: s, lh: l };
     } catch (e) { return def; }
   }
@@ -133,6 +134,8 @@
     app.appendChild(w);
   }
   function showError(msg, retryFn) {
+    closeSettings(false);
+    elGear.hidden = true;
     clear(app);
     var w = el("div", "state");
     w.appendChild(el("div", "ico", "⚠"));
@@ -143,15 +146,21 @@
       b.addEventListener("click", retryFn);
       w.appendChild(b);
     }
+    var home = el("a", "text-link", "연재관으로 돌아가기 →"); home.href = "#/"; w.appendChild(home);
     app.appendChild(w);
+    finishView("불러오지 못했습니다");
   }
   function showEmpty(title, msg) {
+    closeSettings(false);
+    elGear.hidden = true;
     clear(app);
     var w = el("div", "state");
     w.appendChild(el("div", "ico", "☾"));
     w.appendChild(el("h2", null, title || "아직 공개된 작품이 없습니다"));
     w.appendChild(el("p", null, msg || "첫 연재가 시작되면 이곳에 표시됩니다."));
+    var home = el("a", "text-link", "연재관으로 돌아가기 →"); home.href = "#/"; w.appendChild(home);
     app.appendChild(w);
+    finishView(title || "AI 웹소설 연재관");
   }
 
   function setNavTitle(main, sub) {
@@ -165,30 +174,87 @@
     }
   }
 
+  // Each navigation owns its response. Older fetches may finish, never repaint.
+  function beginView(view) {
+    var token = ++renderToken;
+    closeSettings(false);
+    elGear.hidden = true;
+    document.body.setAttribute("data-view", view);
+    app.setAttribute("aria-busy", "true");
+    window.scrollTo(0, 0);
+    return token;
+  }
+  function finishView(title) {
+    app.setAttribute("aria-busy", "false");
+    document.title = title + " | PLCManJP";
+    app.focus({ preventScroll: true });
+  }
+  function publishedEpisodes(meta) {
+    if (!meta || meta.status === "legacy_partial" || meta.legacy_partial === true) return [];
+    return (Array.isArray(meta.episodes) ? meta.episodes : []).filter(function (ep) {
+      return ep && Number.isSafeInteger(ep.episode) && ep.episode > 0;
+    }).slice().sort(function (a, b) { return a.episode - b.episode; });
+  }
+  function breadcrumb(items) {
+    var nav = el("nav", "crumb");
+    nav.setAttribute("aria-label", "현재 위치");
+    items.forEach(function (item, index) {
+      if (index) { var sep = el("span", "sep", "/"); sep.setAttribute("aria-hidden", "true"); nav.appendChild(sep); }
+      var part = el(item.href ? "a" : "span", null, item.text);
+      if (item.href) part.href = item.href;
+      else part.setAttribute("aria-current", "page");
+      nav.appendChild(part);
+    });
+    return nav;
+  }
+  function bookCover(s, index) {
+    var cover = el("div", "book-cover");
+    var tones = { "ash-blade": "ember", "awkward-season": "sage", "hollow-observer": "ink" };
+    cover.setAttribute("data-tone", tones[s.series_id] || "ink");
+    cover.setAttribute("aria-hidden", "true");
+    cover.appendChild(el("span", "cover-imprint", "PLCManJP · 웹소설"));
+    cover.appendChild(el("span", "cover-title", seriesTitle(s)));
+    cover.appendChild(el("span", "cover-rule"));
+    cover.appendChild(el("span", "cover-genre", s.genre || "이야기"));
+    var foot = el("span", "cover-foot");
+    foot.appendChild(el("span", null, "AI FICTION"));
+    if (index != null) foot.appendChild(el("span", null, ("0" + (index + 1)).slice(-2)));
+    cover.appendChild(foot);
+    return cover;
+  }
+
   // ── 뷰: 작품 목록 ──
   function renderList() {
-    elGear.hidden = true;
-    closeSettings();
-    setNavTitle("AI 웹소설 연재관");
+    var token = beginView("list");
+    setNavTitle("웹소설 연재관");
     showLoading("작품 목록을 불러오는 중…");
     getJSON(DATA + "/index.json").then(function (idx) {
+      if (token !== renderToken) return;
       var series = (idx && Array.isArray(idx.series)) ? idx.series : [];
-      // legacy_partial 은 봇이 애초에 넣지 않지만, 방어적으로 한 번 더 거른다.
       series = series.filter(function (s) { return s && s.status !== "legacy_partial" && s.legacy_partial !== true; });
       clear(app);
-      var head = el("div");
-      head.appendChild(el("h1", "page-h", "AI 웹소설 연재관"));
-      head.appendChild(el("p", "page-sub", "AI가 매일 한 편씩 새로운 이야기를 써 내려갑니다. 오늘 이어진 회차를 지금 바로 읽어보세요."));
+      var head = el("header", "library-head");
+      head.appendChild(el("p", "eyebrow", "PLCManJP LABS · AI FICTION"));
+      head.appendChild(el("h1", "page-h", "이야기가 머무는 서가."));
+      head.appendChild(el("p", "page-sub", "하루의 틈에서, 한 편씩. 마음이 가는 이야기를 펼쳐보세요."));
+      var note = el("div", "library-note");
+      note.appendChild(el("span", null, "AI 웹소설 연재관"));
+      note.appendChild(el("span", null, "설치 없이 · 회원가입 없이"));
+      head.appendChild(note);
       app.appendChild(head);
-
-      if (!series.length) { showListEmptyInline(); return; }
-
+      if (!series.length) { showListEmptyInline(); finishView("AI 웹소설 연재관"); return; }
+      var shelfHeading = el("div", "section-heading");
+      shelfHeading.appendChild(el("h2", null, "연재 작품"));
+      shelfHeading.appendChild(el("span", null, series.length + "편의 이야기"));
+      app.appendChild(shelfHeading);
       var list = el("div", "series-list");
-      series.forEach(function (s) {
-        list.appendChild(seriesCard(s));
-      });
+      series.forEach(function (s, index) { list.appendChild(seriesCard(s, index)); });
       app.appendChild(list);
+      var endnote = el("p", "library-endnote", "모든 회차는 AI가 생성한 창작물입니다. 글자 크기와 줄 간격은 읽기 화면에서 조절할 수 있습니다.");
+      app.appendChild(endnote);
+      finishView("AI 웹소설 연재관");
     }).catch(function (err) {
+      if (token !== renderToken) return;
       showError("작품 목록(index.json)을 불러오지 못했습니다. " + err.message, renderList);
     });
   }
@@ -201,15 +267,17 @@
     app.appendChild(w);
   }
 
-  function seriesCard(s) {
+  function seriesCard(s, index) {
     var a = el("a", "series-card");
     a.href = "#/s/" + encodeURIComponent(s.series_id);
+    a.appendChild(bookCover(s, index));
+    var info = el("div", "book-info");
     var row1 = el("div", "row1");
     if (s.genre) row1.appendChild(el("span", "genre", s.genre));
     row1.appendChild(statusBadge(s.status));
-    a.appendChild(row1);
-    a.appendChild(el("h3", null, seriesTitle(s) || "(제목 없음)"));
-    if (s.summary) a.appendChild(el("p", "desc", s.summary));
+    info.appendChild(row1);
+    info.appendChild(el("h3", null, seriesTitle(s) || "(제목 없음)"));
+    if (s.summary) info.appendChild(el("p", "desc", s.summary));
     var foot = el("div", "foot");
     if (s.latest_episode != null) {
       var f1 = el("span"); f1.appendChild(document.createTextNode("최신화 ")); f1.appendChild(el("b", null, s.latest_episode + "화")); foot.appendChild(f1);
@@ -220,30 +288,32 @@
     if (s.started_at) {
       var f3 = el("span"); f3.appendChild(document.createTextNode("연재 시작 ")); f3.appendChild(el("b", null, fmtDate(s.started_at))); foot.appendChild(f3);
     }
-    a.appendChild(foot);
+    info.appendChild(foot);
+    info.appendChild(el("span", "book-link", "작품 펼치기 →"));
+    a.appendChild(info);
     return a;
   }
 
   // ── 뷰: 작품 상세 ──
   function renderSeries(seriesId) {
-    elGear.hidden = true;
-    closeSettings();
-    setNavTitle("AI 웹소설 연재관");
+    var token = beginView("series");
+    setNavTitle("웹소설 연재관");
     showLoading("작품 정보를 불러오는 중…");
     getJSON(DATA + "/series/" + encodeURIComponent(seriesId) + "/meta.json").then(function (m) {
+      if (token !== renderToken) return;
+      if (m.status === "legacy_partial" || m.legacy_partial === true) {
+        showEmpty("공개되지 않은 작품입니다", "연재관에서 공개된 작품을 선택해 주세요."); return;
+      }
       clear(app);
-      var eps = Array.isArray(m.episodes) ? m.episodes.slice() : [];
-      eps.sort(function (a, b) { return (a.episode || 0) - (b.episode || 0); });
+      var eps = publishedEpisodes(m);
 
-      // breadcrumb
-      var cb = el("div", "crumb");
-      var home = el("a", null, "연재관"); home.href = "#/"; cb.appendChild(home);
-      cb.appendChild(el("span", "sep", "/"));
-      cb.appendChild(el("span", null, seriesTitle(m) || seriesId));
-      app.appendChild(cb);
+      app.appendChild(breadcrumb([{ text: "연재관", href: "#/" }, { text: seriesTitle(m) || seriesId }]));
 
       // head
+      var spread = el("section", "detail-spread");
+      spread.appendChild(bookCover(m));
       var head = el("div", "detail-head");
+      head.appendChild(el("p", "eyebrow", "이야기의 첫 장을 열어보세요"));
       var row1 = el("div", "row1");
       if (m.genre) row1.appendChild(el("span", "genre", m.genre));
       row1.appendChild(statusBadge(m.status));
@@ -252,7 +322,7 @@
       if (m.summary) head.appendChild(el("p", "intro", m.summary));
 
       var facts = el("div", "facts");
-      var latest = m.latest_episode != null ? m.latest_episode : (eps.length ? eps[eps.length - 1].episode : null);
+      var latest = eps.length ? eps[eps.length - 1].episode : null;
       if (eps.length) { var c1 = el("span"); c1.appendChild(document.createTextNode("총 ")); c1.appendChild(el("b", null, eps.length + "화")); facts.appendChild(c1); }
       if (m.started_at) { var c2 = el("span"); c2.appendChild(document.createTextNode("연재 시작 ")); c2.appendChild(el("b", null, fmtDate(m.started_at))); facts.appendChild(c2); }
       if (m.updated_at) { var c3 = el("span"); c3.appendChild(document.createTextNode("마지막 갱신 ")); c3.appendChild(el("b", null, fmtDate(m.updated_at))); facts.appendChild(c3); }
@@ -264,68 +334,70 @@
         read.href = "#/s/" + encodeURIComponent(seriesId) + "/" + latest;
         cta.appendChild(read);
         if (eps.length && eps[0].episode != null && eps[0].episode !== latest) {
-          var first = el("a", "btn btn-ghost", "1화부터");
+          var first = el("a", "btn btn-ghost", eps[0].episode + "화부터");
           first.href = "#/s/" + encodeURIComponent(seriesId) + "/" + eps[0].episode;
           cta.appendChild(first);
         }
         head.appendChild(cta);
       }
-      app.appendChild(head);
+      spread.appendChild(head);
+      app.appendChild(spread);
 
-      // episode index
-      app.appendChild(el("div", "ep-index-h", "회차 목록"));
-      if (!eps.length) { app.appendChild(function(){var w=el("div","state");w.appendChild(el("p",null,"등록된 회차가 없습니다."));return w;}()); return; }
+      var indexHead = el("div", "section-heading");
+      indexHead.appendChild(el("h2", null, "차례"));
+      indexHead.appendChild(el("span", null, "공개된 " + eps.length + "개 회차 · 처음부터"));
+      app.appendChild(indexHead);
+      if (!eps.length) { app.appendChild(el("p", "state", "등록된 회차가 없습니다.")); finishView(seriesTitle(m)); return; }
       var list = el("div", "ep-list");
+      list.setAttribute("role", "list");
+      list.setAttribute("aria-label", "회차 목록");
       eps.forEach(function (ep) {
         var a = el("a", "ep-item");
         a.href = "#/s/" + encodeURIComponent(seriesId) + "/" + ep.episode;
+        var item = el("div"); item.setAttribute("role", "listitem");
         a.appendChild(el("span", "no", (ep.episode != null ? ep.episode : "?") + "화"));
         a.appendChild(el("span", "et", ep.title || "무제"));
         if (ep.published_at) a.appendChild(el("span", "em", fmtDate(ep.published_at)));
-        list.appendChild(a);
+        item.appendChild(a); list.appendChild(item);
       });
       app.appendChild(list);
+      finishView(seriesTitle(m));
     }).catch(function (err) {
+      if (token !== renderToken) return;
       showError("작품 정보(meta.json)를 불러오지 못했습니다. " + err.message, function () { renderSeries(seriesId); });
     });
   }
 
   // ── 뷰: 회차 리더 ──
   function renderEpisode(seriesId, epNo) {
-    elGear.hidden = false;
-    closeSettings();
-    setNavTitle("AI 웹소설 연재관");
+    var token = beginView("episode");
+    setNavTitle("웹소설 연재관");
     showLoading("회차를 불러오는 중…");
     // meta + episode 병렬 로드 (이전/다음 계산에 meta 필요)
     Promise.all([
       getJSON(DATA + "/series/" + encodeURIComponent(seriesId) + "/meta.json"),
       getJSON(DATA + "/series/" + encodeURIComponent(seriesId) + "/episodes/" + pad6(epNo) + ".json")
     ]).then(function (res) {
+      if (token !== renderToken) return;
       var m = res[0], ep = res[1];
-      clear(app);
-
-      var eps = Array.isArray(m.episodes) ? m.episodes.map(function (e) { return e.episode; }).filter(function (n) { return n != null; }) : [];
-      eps.sort(function (a, b) { return a - b; });
+      var eps = publishedEpisodes(m).map(function (e) { return e.episode; });
       var pos = eps.indexOf(epNo);
+      if (pos < 0) { showEmpty("공개되지 않은 회차입니다", "작품의 차례에서 공개된 회차를 선택해 주세요."); return; }
+      clear(app);
       var prev = pos > 0 ? eps[pos - 1] : null;
       var next = (pos >= 0 && pos < eps.length - 1) ? eps[pos + 1] : null;
 
       setNavTitle(seriesTitle(m) || seriesId, "/ " + epNo + "화");
 
-      // breadcrumb
-      var cb = el("div", "crumb");
-      var home = el("a", null, "연재관"); home.href = "#/"; cb.appendChild(home);
-      cb.appendChild(el("span", "sep", "/"));
-      var sl = el("a", null, seriesTitle(m) || seriesId); sl.href = "#/s/" + encodeURIComponent(seriesId); cb.appendChild(sl);
-      cb.appendChild(el("span", "sep", "/"));
-      cb.appendChild(el("span", null, epNo + "화"));
-      app.appendChild(cb);
+      app.appendChild(breadcrumb([{ text: "연재관", href: "#/" }, { text: seriesTitle(m) || seriesId, href: "#/s/" + encodeURIComponent(seriesId) }, { text: epNo + "화" }]));
 
       // reader head
-      var rh = el("div", "reader-head");
+      var rh = el("header", "reader-head");
+      rh.appendChild(el("p", "reader-series", seriesTitle(m) || seriesId));
       var seasonTxt = (ep.season != null ? ("시즌 " + ep.season + " / ") : "");
       rh.appendChild(el("div", "epno", seasonTxt + epNo + "화"));
-      rh.appendChild(el("h1", null, ep.title || "무제"));
+      var heading = el("h1", null, ep.title || "무제"); heading.id = "episodeTitle";
+      rh.appendChild(heading);
       var rm = el("div", "rmeta");
       if (ep.published_at) rm.appendChild(el("span", null, fmtDate(ep.published_at)));
       if (ep.slot) rm.appendChild(el("span", null, ep.slot));
@@ -335,6 +407,7 @@
 
       // body — 문단 분리, textContent 로만 삽입 (XSS 안전)
       var body = el("article", "reader-body");
+      body.setAttribute("aria-labelledby", "episodeTitle");
       var raw = (typeof ep.body === "string") ? ep.body : "";
       var paras = raw.split(/\n{2,}/); // 빈 줄로 문단 분리
       paras.forEach(function (blk) {
@@ -351,7 +424,8 @@
       app.appendChild(body);
 
       // prev / toc / next — 한 줄 흐름(라벨 · 회차번호, 화살표는 바깥쪽)
-      var nav = el("div", "epnav");
+      var ending = el("p", "reader-end", epNo + "화 끝"); app.appendChild(ending);
+      var nav = el("nav", "epnav"); nav.setAttribute("aria-label", "회차 이동");
       // 이전화
       if (prev != null) {
         var pa = el("a", "prev"); pa.href = "#/s/" + encodeURIComponent(seriesId) + "/" + prev;
@@ -383,8 +457,10 @@
         nav.appendChild(ns);
       }
       app.appendChild(nav);
-      window.scrollTo(0, 0);
+      elGear.hidden = false;
+      finishView(ep.title + " — " + seriesTitle(m));
     }).catch(function (err) {
+      if (token !== renderToken) return;
       showError("회차를 불러오지 못했습니다. " + err.message, function () { renderEpisode(seriesId, epNo); });
     });
   }
@@ -392,7 +468,13 @@
   // ── 설정 패널 ──
   function buildSettings() {
     clear(elSettings);
-    var w = el("div", "wrap");
+    var w = el("div", "settings-inner");
+    var panelHead = el("div", "settings-head");
+    var title = el("h2", null, "읽기 설정"); title.id = "settingsTitle";
+    panelHead.appendChild(title);
+    var dismiss = el("button", "settings-close", "닫기 ×"); dismiss.type = "button";
+    dismiss.addEventListener("click", function () { closeSettings(); });
+    panelHead.appendChild(dismiss); w.appendChild(panelHead);
 
     // 글자 크기
     var r1 = el("div", "set-row");
@@ -417,6 +499,7 @@
     r2.appendChild(reset);
 
     w.appendChild(r1); w.appendChild(r2);
+    w.appendChild(el("p", "settings-note", "설정은 현재 브라우저에 저장됩니다."));
     elSettings.appendChild(w);
 
     function refresh() {
@@ -444,9 +527,11 @@
     elSettings.removeAttribute("inert");
     elSettings.setAttribute("aria-hidden", "false");
     elGear.setAttribute("aria-expanded", "true");
+    var first = elSettings.querySelector("button");
+    if (first) first.focus();
   }
-  function closeSettings() {
-    if (elSettings.contains(document.activeElement)) {
+  function closeSettings(returnFocus) {
+    if (returnFocus !== false && elSettings.contains(document.activeElement) && !elGear.hidden) {
       elGear.focus();
     }
     elSettings.classList.remove("open");
@@ -462,27 +547,43 @@
     }
   });
 
-  // ── 라우터 ──
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && elSettings.classList.contains("open")) {
+      closeSettings(); elGear.focus(); event.preventDefault();
+    }
+  });
+  document.addEventListener("click", function (event) {
+    if (elSettings.classList.contains("open") && !elSettings.contains(event.target) && !elGear.contains(event.target)) closeSettings(false);
+  });
+  var skip = document.getElementById("skipLink");
+  if (skip) skip.addEventListener("click", function (event) {
+    event.preventDefault(); app.focus({ preventScroll: true }); app.scrollIntoView();
+  });
+
+  // ── 라우터: preserve existing hash URLs, reject malformed paths safely ──
   function parseHash() {
     var h = location.hash.replace(/^#/, "");
-    if (!h || h === "/" ) return { view: "list" };
+    if (!h || h === "/") return { view: "list" };
     var parts = h.replace(/^\//, "").split("/");
-    // ["s", <id>] 또는 ["s", <id>, <ep>]
-    if (parts[0] === "s" && parts[1]) {
-      var sid = decodeURIComponent(parts[1]);
+    if (parts[0] === "s" && parts[1] && parts.length <= 3) {
+      var sid;
+      try { sid = decodeURIComponent(parts[1]); } catch (e) { return { view: "invalid" }; }
+      if (!/^[a-z0-9][a-z0-9_-]*$/i.test(sid)) return { view: "invalid" };
       if (parts[2]) {
-        var n = parseInt(parts[2], 10);
-        if (!isNaN(n) && n > 0) return { view: "episode", series: sid, ep: n };
+        var n = Number(parts[2]);
+        if (/^\d+$/.test(parts[2]) && Number.isSafeInteger(n) && n > 0) return { view: "episode", series: sid, ep: n };
+        return { view: "invalid" };
       }
       return { view: "series", series: sid };
     }
-    return { view: "list" };
+    return { view: "invalid" };
   }
   function route() {
     var r = parseHash();
     if (r.view === "episode") renderEpisode(r.series, r.ep);
     else if (r.view === "series") renderSeries(r.series);
-    else renderList();
+    else if (r.view === "list") renderList();
+    else { beginView("list"); showEmpty("페이지를 찾을 수 없습니다", "주소를 확인하거나 연재관에서 작품을 선택해 주세요."); }
   }
 
   buildSettings();
