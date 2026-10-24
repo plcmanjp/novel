@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" id="themeColor" content="#f4f7fb">
+<meta name="theme-color" id="themeColor" content="#faf9f6">
 <title>AI 웹소설 연재관 | PLCManJP</title>
 <meta name="description" content="AI가 매일 한 편씩 새로운 이야기를 이어 쓰는 웹소설 연재관. 설치와 회원가입 없이 브라우저에서 바로 읽으세요.">
 <link rel="icon" href="/novel/favicon.svg" type="image/svg+xml">
@@ -21,29 +21,29 @@
 <meta property="og:image:alt" content="AI가 매일 한 편씩 이어 쓰는 웹소설">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="canonical" href="https://plcmanjp.github.io/novel/">
-<link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
-<link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<script>try{var t=localStorage.getItem("plcmanjp-theme"),old=localStorage.getItem("plcmanjp-tool-theme");if(t!=="light"&&t!=="dark"&&(old==="light"||old==="dark")){t=old;localStorage.setItem("plcmanjp-theme",t);localStorage.removeItem("plcmanjp-tool-theme");}if(t!=="light"&&t!=="dark")t=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";document.documentElement.setAttribute("data-theme",t);var m=document.getElementById("themeColor");if(m)m.setAttribute("content",t==="dark"?"#0c1016":"#f4f7fb");}catch(e){document.documentElement.setAttribute("data-theme","light");}</script>
+<script>try{var t=localStorage.getItem("plcmanjp-theme"),old=localStorage.getItem("plcmanjp-tool-theme");if(t!=="light"&&t!=="dark"&&(old==="light"||old==="dark")){t=old;localStorage.setItem("plcmanjp-theme",t);localStorage.removeItem("plcmanjp-tool-theme");}if(t!=="light"&&t!=="dark")t=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";document.documentElement.setAttribute("data-theme",t);var m=document.getElementById("themeColor");if(m)m.setAttribute("content",t==="dark"?"#181a19":"#faf9f6");}catch(e){document.documentElement.setAttribute("data-theme","light");}</script>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <a class="skip-link" href="#app" id="skipLink">본문으로 바로가기</a>
   <header class="top">
     <div class="wrap">
       <a class="home" href="https://plcmanjp.github.io/" aria-label="PLCManJP 홈으로">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>PLCManJP
+        PLCManJP<span class="brand-dot" aria-hidden="true">.</span>
       </a>
-      <div class="title" id="navTitle">AI 웹소설 연재관</div>
-      <button class="themebtn" id="themeBtn" type="button" aria-label="테마 전환: 현재 라이트" aria-live="polite">🌓 <span id="themeLbl">라이트</span></button>
+      <div class="title" id="navTitle">웹소설 연재관</div>
+      <button class="themebtn" id="themeBtn" type="button" aria-label="테마 전환: 현재 라이트">
+        <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M20.8 13.1A8.9 8.9 0 0 1 10.9 3.2a9 9 0 1 0 9.9 9.9Z"/></svg><span id="themeLbl">라이트</span>
+      </button>
       <button class="gear" id="gearBtn" type="button" hidden aria-label="읽기 설정" aria-controls="settings" aria-expanded="false">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h11M4 12h16M4 17h9"/><circle cx="19" cy="7" r="2.2" fill="currentColor" stroke="none"/><circle cx="9" cy="17" r="2.2" fill="currentColor" stroke="none"/></svg>
+        <span aria-hidden="true">가</span><span class="gear-label">읽기 설정</span>
       </button>
     </div>
   </header>
 
-  <div class="settings" id="settings" aria-hidden="true" inert></div>
+  <section class="settings" id="settings" aria-labelledby="settingsTitle" aria-hidden="true" inert></section>
 
-  <main class="wrap" id="app">
+  <main class="wrap" id="app" tabindex="-1" aria-busy="true">
     <div class="state">
       <div class="spinner"></div>
       <p>불러오는 중…</p>
@@ -51,9 +51,9 @@
   </main>
 
   <noscript>
-    <div class="wrap" style="padding:40px 20px;text-align:center;color:var(--tx2)">
-      <h2 style="font-size:1.05rem;color:var(--tx);margin-bottom:10px">JavaScript가 필요합니다</h2>
-      <p style="font-size:.9rem;line-height:1.7;max-width:400px;margin:0 auto">
+    <div class="wrap state">
+      <h2>JavaScript가 필요합니다</h2>
+      <p>
         이 연재관은 회차 본문을 안전하게 표시하기 위해 JavaScript로 텍스트를 렌더링합니다.
         브라우저에서 JavaScript를 켜면 작품 목록과 회차를 읽을 수 있습니다.
       </p>
@@ -76,3 +76,4 @@
   <script src="app.js"></script>
 </body>
 </html>
+
