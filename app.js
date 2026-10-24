@@ -194,7 +194,7 @@
     if (!reader || activeReader !== reader || reader.token !== renderToken || !reader.body.isConnected) return;
     var state = progressStore.get(reader.series, reader.eps);
     var read = state.completed.indexOf(reader.episode) >= 0;
-    var message = reader.suspended ? "다른 탭에서 기록을 지웠습니다. 회차를 다시 열면 새로 기록합니다." : (read ? "이 회차 읽음 · 본문 끝 도달 기준" : "본문 끝까지 이동하면 읽음으로 표시됩니다. 짧은 회차도 아래로 스크롤하거나 End 키로 확인해 주세요.");
+    var message = reader.suspended ? "다른 탭에서 기록을 지웠습니다. 회차를 다시 열면 새로 기록합니다." : (read ? "이 회차 읽음 · 본문 끝 도달 기준" : "직접 스크롤해 본문 끝이 화면에 보이면 읽음으로 표시됩니다. 열기·위치 복원만으로는 표시하지 않습니다.");
     if (reader.status.textContent !== message) reader.status.textContent = message;
     var notice = storageMessage(state);
     if (reader.notice.textContent !== notice) reader.notice.textContent = notice;
@@ -810,11 +810,11 @@
     elSettings.setAttribute("aria-hidden", "false");
     elGear.setAttribute("aria-expanded", "true");
     var first = elSettings.querySelector("button");
-    if (first) first.focus();
+    if (first) first.focus({ preventScroll: true });
   }
   function closeSettings(returnFocus) {
     if (returnFocus !== false && elSettings.contains(document.activeElement) && !elGear.hidden) {
-      elGear.focus();
+      elGear.focus({ preventScroll: true });
     }
     elSettings.classList.remove("open");
     elSettings.setAttribute("inert", "");
@@ -831,7 +831,7 @@
 
   document.addEventListener("keydown", function (event) {
     if (event.key === "Escape" && elSettings.classList.contains("open")) {
-      closeSettings(); elGear.focus(); event.preventDefault();
+      closeSettings(); elGear.focus({ preventScroll: true }); event.preventDefault();
     }
   });
   document.addEventListener("click", function (event) {
