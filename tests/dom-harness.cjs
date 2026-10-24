@@ -123,7 +123,14 @@ class Node extends Target {
   contains(node) { return node === this || this.childNodes.some(child => child.contains(node)); }
   focus() { this.ownerDocument.activeElement = this; }
   blur() { if (this.ownerDocument.activeElement === this) this.ownerDocument.activeElement = this.ownerDocument.body; }
-  getBoundingClientRect() { return { top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0 }; }
+  getBoundingClientRect() {
+    const supplied = this.ownerDocument.layout?.(this) || {};
+    const top = supplied.top ?? 0;
+    const left = supplied.left ?? 0;
+    const bottom = supplied.bottom ?? top + (supplied.height ?? 0);
+    const right = supplied.right ?? left + (supplied.width ?? 0);
+    return { x: left, y: top, top, bottom, left, right, width: right - left, height: bottom - top, ...supplied };
+  }
   scrollIntoView() {}
   matches(selector) {
     const attributes = [...selector.matchAll(/\[([^=\]]+)(?:=["']?([^\]"']+)["']?)?\]/g)];
@@ -186,6 +193,7 @@ class Document extends Node {
   createElement(tag) { return new Node(tag, this); }
   createTextNode(text) { return new Node('#text', this, String(text)); }
   getElementById(id) { return this.querySelector('#' + id); }
+  hasFocus() { return this.focused !== false; }
 }
 
 function parseMarkup(document, html) {
@@ -216,23 +224,54 @@ function setup(options = {}) {
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   const document = new Document();
   parseMarkup(document, html);
-  const local = new Map(Object.entries(options.storage || {}));
+  // Multiple contexts may share this map; storage events remain explicit so tests
+  // can reproduce delayed cross-tab delivery without pretending to be a browser.
+  const local = options.sharedStorage || new Map(Object.entries(options.storage || {}));
   const writes = [];
+  const storageFaults = { read: false, write: false, remove: false, ...options.storageFaults };
+  function storageFailure(kind) {
+    const failure = options.blockStorage || storageFaults[kind];
+    if (failure) throw failure instanceof Error ? failure : new Error('Storage ' + kind + ' disabled');
+  }
   const localStorage = {
-    getItem(key) { if (options.blockStorage) throw new Error('Storage disabled'); return local.get(key) ?? null; },
-    setItem(key, value) { if (options.blockStorage) throw new Error('Storage disabled'); local.set(key, String(value)); writes.push([key, String(value)]); },
-    removeItem(key) { if (options.blockStorage) throw new Error('Storage disabled'); local.delete(key); }
+    getItem(key) { storageFailure('read'); return local.get(key) ?? null; },
+    setItem(key, value) { storageFailure('write'); local.set(key, String(value)); writes.push([key, String(value)]); },
+    removeItem(key) { storageFailure('remove'); local.delete(key); },
+    key(index) { storageFailure('read'); return [...local.keys()][index] ?? null; },
+    get length() { storageFailure('read'); return local.size; }
   };
   const window = new Target();
   document.parentNode = window;
   const location = { hash: options.hash || '#/' };
   const history = { entries: [location.hash], position: 0, scrollRestoration: 'auto' };
   const scrolls = [];
-  Object.assign(window, { document, location, localStorage, history, innerHeight: 800, scrollY: 0, pageYOffset: 0 });
+  Object.assign(window, { document, location, localStorage, history, innerHeight: options.innerHeight ?? 800, scrollY: 0, pageYOffset: 0 });
+  document.focused = options.focused !== false;
+  document.visibilityState = options.visibilityState || 'visible';
   window.scrollTo = (...args) => { scrolls.push(args); window.scrollY = typeof args[0] === 'object' ? args[0].top : args[1]; window.pageYOffset = window.scrollY; };
   window.matchMedia = query => ({ matches: query.includes('dark') ? !!options.systemDark : false, addEventListener() {}, removeEventListener() {} });
-  window.requestAnimationFrame = callback => { callback(0); return 1; };
-  window.cancelAnimationFrame = () => {};
+  let now = options.now ?? 1000000;
+  let callbackId = 0;
+  const animationFrames = new Map();
+  const timers = new Map();
+  window.requestAnimationFrame = callback => {
+    const id = ++callbackId;
+    if (options.manualFrames) animationFrames.set(id, callback);
+    else callback(0);
+    return id;
+  };
+  window.cancelAnimationFrame = id => { animationFrames.delete(id); };
+  const scheduleTimeout = options.manualTimers ? (callback, delay = 0, ...args) => {
+    const id = ++callbackId;
+    timers.set(id, { callback, due: now + Math.max(0, Number(delay) || 0), args });
+    return id;
+  } : setTimeout;
+  const cancelTimeout = options.manualTimers ? id => { timers.delete(id); } : clearTimeout;
+  const ClockDate = options.manualTimers ? class extends Date {
+    constructor(...args) { super(...(args.length ? args : [now])); }
+    static now() { return now; }
+  } : Date;
+  Object.assign(window, { setTimeout: scheduleTimeout, clearTimeout: cancelTimeout, Date: ClockDate });
   const requests = [];
   const pending = [];
   function dataFor(url) {
@@ -261,7 +300,7 @@ function setup(options = {}) {
     if (options.hold?.(url, request.index)) return new Promise((resolve, reject) => pending.push({ ...request, resolve, reject }));
     return response(dataFor(url));
   };
-  const sandbox = { document, window, location, history, localStorage, fetch, console, AbortController, URL, Event: TestEvent, KeyboardEvent: TestEvent, setTimeout, clearTimeout, requestAnimationFrame: window.requestAnimationFrame, cancelAnimationFrame: window.cancelAnimationFrame };
+  const sandbox = { document, window, location, history, localStorage, fetch, console, AbortController, URL, Date: ClockDate, Event: TestEvent, KeyboardEvent: TestEvent, setTimeout: scheduleTimeout, clearTimeout: cancelTimeout, requestAnimationFrame: window.requestAnimationFrame, cancelAnimationFrame: window.cancelAnimationFrame };
   const context = vm.createContext(sandbox);
   document.navigate = hash => {
     if (hash === location.hash) return;
@@ -272,7 +311,43 @@ function setup(options = {}) {
     window.dispatchEvent(new TestEvent('hashchange', { bubbles: false }));
   };
   const env = {
-    document, window, location, history, local, writes, requests, pending, scrolls, context,
+    document, window, location, history, local, writes, storageFaults, requests, pending, scrolls, context,
+    // Rectangles are viewport-relative and supplied by the test, not CSS-derived.
+    layout: options.layout || null,
+    get now() { return now; },
+    get queuedFrames() { return animationFrames.size; },
+    get queuedTimers() { return timers.size; },
+    frame: async () => {
+      const callbacks = [...animationFrames.values()];
+      animationFrames.clear();
+      for (const callback of callbacks) callback(now);
+      await flush();
+      return callbacks.length;
+    },
+    frames: async (count = 1) => { for (let index = 0; index < count; index++) await env.frame(); },
+    advance: async milliseconds => {
+      if (!options.manualTimers) throw new Error('advance requires setup({ manualTimers: true })');
+      const target = now + Math.max(0, milliseconds);
+      let executions = 0;
+      while (true) {
+        const next = [...timers.entries()].filter(([, timer]) => timer.due <= target).sort((a, b) => a[1].due - b[1].due || a[0] - b[0])[0];
+        if (!next) break;
+        if (++executions > 10000) throw new Error('Too many timers: possible unbounded timer loop');
+        const [id, timer] = next;
+        now = timer.due;
+        timers.delete(id);
+        timer.callback(...timer.args);
+        await flush();
+      }
+      now = target;
+      await flush();
+    },
+    scroll: async (y, { input = true } = {}) => {
+      if (input) document.body.dispatchEvent(new TestEvent('wheel', { deltaY: y - window.scrollY, isTrusted: true }));
+      window.scrollTo(0, y);
+      window.dispatchEvent(new TestEvent('scroll', { bubbles: false, isTrusted: true }));
+      await flush();
+    },
     app: document.getElementById('app'),
     byId: id => document.getElementById(id),
     all: selector => document.querySelectorAll(selector),
@@ -296,6 +371,7 @@ function setup(options = {}) {
     },
     flush
   };
+  document.layout = node => env.layout?.(node, env);
   for (const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
     const src = match[1].match(/\bsrc=["']([^"']+)["']/);
     const filename = src ? src[1].replace(/\?.*$/, '') : 'inline-theme-init.js';

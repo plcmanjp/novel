@@ -51,6 +51,247 @@
   });
   applyTheme(currentTheme, false);
 
+  // ── 이 브라우저의 읽기 기록 (본문/계정 정보는 전송하지 않음) ──
+  var progressViews = [];
+  var activeReader = null;
+  var pendingResume = null;
+  var progressStore = window.NovelProgress.create({ onChange: refreshProgressViews });
+  var tabId = Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
+  var openSequence = 0;
+  try { window.history.scrollRestoration = "manual"; } catch (e) {}
+
+  function refreshProgressViews() {
+    progressViews.forEach(function (refresh) { refresh(); });
+  }
+  function progressSummary(state) {
+    return (state.last ? "최근 " + state.last.episode + "화 · " : "") + "읽음 " + state.completed.length + "개";
+  }
+  function storageMessage(state) {
+    if (state.status === "corrupt") return "저장된 기록을 확인할 수 없어 덮어쓰지 않았습니다. 기록 지우기로 이 작품만 새로 시작할 수 있습니다.";
+    if (state.status === "memory") return "브라우저 저장소를 사용할 수 없어 기록이 이 탭에만 임시로 남습니다. 탭을 닫거나 새로고침하면 사라질 수 있습니다.";
+    return "기록은 이 브라우저에만 저장되며 서버로 보내지 않습니다. 기기 간 동기화는 안 됩니다. 브라우저 데이터 삭제·시크릿 모드에서는 사라질 수 있습니다.";
+  }
+  function resumeLink(sid, last) {
+    var link = el("a", "btn btn-primary resume-link", "이어 읽기 · " + last.episode + "화");
+    link.href = "#/s/" + encodeURIComponent(sid) + "/" + last.episode;
+    link.addEventListener("click", function (event) {
+      pendingResume = { series: sid, episode: last.episode, position: last.position };
+      if (location.hash === link.href) { event.preventDefault(); renderEpisode(sid, last.episode); }
+    });
+    return link;
+  }
+  function progressPanel(sid, eps) {
+    var box = el("section", "reading-record");
+    box.setAttribute("aria-label", "이 브라우저의 읽기 기록");
+    var summary = el("p", "reading-summary");
+    var actions = el("div", "record-actions");
+    var resumeSlot = el("span", "resume-slot"); actions.appendChild(resumeSlot);
+    var notice = el("p", "local-note");
+    var feedback = el("p", "record-feedback"); feedback.setAttribute("role", "status");
+    var confirmation = el("div", "record-confirm"); confirmation.id = "record-confirm-" + sid; confirmation.hidden = true;
+    confirmation.appendChild(el("p", null, "이 작품의 이어 읽기 위치와 읽음 표시를 지울까요? 다른 작품과 읽기 설정은 유지됩니다."));
+    var erase = el("button", "btn btn-ghost", "이 작품 기록 지우기"); erase.type = "button";
+    var cancel = el("button", "btn btn-ghost", "취소"); cancel.type = "button";
+    confirmation.appendChild(erase); confirmation.appendChild(cancel);
+    var reset = el("button", "record-reset", "기록 지우기"); reset.type = "button";
+    reset.setAttribute("aria-expanded", "false");
+    reset.setAttribute("aria-controls", confirmation.id);
+    actions.appendChild(reset);
+    function dismiss() { confirmation.hidden = true; reset.setAttribute("aria-expanded", "false"); reset.focus(); }
+    reset.addEventListener("click", function () { confirmation.hidden = false; reset.setAttribute("aria-expanded", "true"); cancel.focus(); });
+    cancel.addEventListener("click", dismiss);
+    confirmation.addEventListener("keydown", function (event) { if (event.key === "Escape") { event.preventDefault(); dismiss(); } });
+    erase.addEventListener("click", function () {
+      progressStore.clear(sid);
+      dismiss();
+      feedback.textContent = "이 작품의 읽기 기록을 지웠습니다.";
+      refreshProgressViews();
+    });
+    function refresh() {
+      var state = progressStore.get(sid, eps);
+      summary.textContent = "이 브라우저 · " + progressSummary(state);
+      clear(resumeSlot);
+      if (state.last) resumeSlot.appendChild(resumeLink(sid, state.last));
+      notice.textContent = storageMessage(state);
+    }
+    progressViews.push(refresh);
+    box.appendChild(summary); box.appendChild(actions); box.appendChild(confirmation); box.appendChild(feedback); box.appendChild(notice);
+    refresh();
+    return box;
+  }
+  function ownsReader(reader) {
+    return !!reader && activeReader === reader && reader.token === renderToken && reader.body.isConnected && !reader.suspended;
+  }
+  function visibleReader(reader) {
+    return ownsReader(reader) && document.visibilityState === "visible" && !(document.prerendering === true);
+  }
+  function readerTop() {
+    var top = document.querySelector(".top");
+    return Math.max(16, top ? top.getBoundingClientRect().bottom + 18 : 84);
+  }
+  function capturePosition(reader) {
+    var y = window.scrollY || 0;
+    var rect = reader.body.getBoundingClientRect();
+    var height = Math.max(1, rect.height);
+    // ratio 0 anchors the preface/header region; offset is its fractional scroll.
+    if (rect.top > readerTop()) return { paragraph: 0, offset: y / Math.max(1, y + rect.top), ratio: 0 };
+    var ratio = y <= 1 ? 0 : Math.min(1, Math.max(0.000001, (readerTop() - rect.top) / height));
+    var ps = reader.body.children;
+    for (var i = 0; i < ps.length; i++) {
+      var p = ps[i].getBoundingClientRect();
+      if (p.bottom > readerTop() || i === ps.length - 1) {
+        return { paragraph: i, offset: Math.max(0, Math.min(1, (readerTop() - p.top) / Math.max(1, p.height))), ratio: ratio };
+      }
+    }
+    return { paragraph: 0, offset: 0, ratio: ratio };
+  }
+  function restorePosition(reader, position) {
+    if (!ownsReader(reader) || !position) return;
+    if (position.ratio === 0) { window.scrollTo(0, Math.max(0, position.offset * ((window.scrollY || 0) + reader.body.getBoundingClientRect().top))); return; }
+    var p = reader.body.children[position.paragraph];
+    var rect = (p || reader.body).getBoundingClientRect();
+    if (!rect.height) return;
+    var offset = p ? position.offset : position.ratio;
+    window.scrollTo(0, Math.max(0, (window.scrollY || 0) + rect.top + offset * rect.height - readerTop()));
+  }
+  // Wait for a stable layout and font metrics; never restore an abandoned route.
+  function settleReader(reader, position, done) {
+    var revision = ++reader.layoutRevision;
+    reader.ready = false;
+    var frames = 0, stable = 0, lastHeight = -1;
+    function frame() {
+      if (!ownsReader(reader) || revision !== reader.layoutRevision) return;
+      var height = reader.body.getBoundingClientRect().height;
+      stable = height === lastHeight ? stable + 1 : 0;
+      lastHeight = height; frames++;
+      if (stable < 2 && frames < 12) { window.requestAnimationFrame(frame); return; }
+      restorePosition(reader, position);
+      window.requestAnimationFrame(function () {
+        if (!ownsReader(reader) || revision !== reader.layoutRevision) return;
+        reader.ready = true;
+        reader.lastY = window.scrollY || 0;
+        reader.intent = false;
+        if (done) done();
+      });
+    }
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (ownsReader(reader) && revision === reader.layoutRevision) window.requestAnimationFrame(frame); });
+    else window.requestAnimationFrame(frame);
+  }
+  function saveReader(reader) {
+    if (!visibleReader(reader) || !reader.ready || !reader.started) return;
+    clearTimeout(reader.saveTimer); reader.saveTimer = null;
+    progressStore.updateLast(reader.series, reader.episode, capturePosition(reader), reader.epoch, reader.stamp);
+  }
+  function stopReader() {
+    var reader = activeReader;
+    if (!reader) return;
+    saveReader(reader);
+    clearTimeout(reader.saveTimer);
+    reader.layoutRevision++;
+    activeReader = null;
+  }
+  function readerStatus(reader) {
+    if (!reader || activeReader !== reader || reader.token !== renderToken || !reader.body.isConnected) return;
+    var state = progressStore.get(reader.series, reader.eps);
+    var read = state.completed.indexOf(reader.episode) >= 0;
+    var message = reader.suspended ? "다른 탭에서 기록을 지웠습니다. 회차를 다시 열면 새로 기록합니다." : (read ? "이 회차 읽음 · 본문 끝 도달 기준" : "본문 끝까지 이동하면 읽음으로 표시됩니다. 짧은 회차도 아래로 스크롤하거나 End 키로 확인해 주세요.");
+    if (reader.status.textContent !== message) reader.status.textContent = message;
+    var notice = storageMessage(state);
+    if (reader.notice.textContent !== notice) reader.notice.textContent = notice;
+  }
+  function checkCompletion(reader) {
+    if (!visibleReader(reader) || !reader.ready || !reader.started || !reader.intent || elSettings.classList.contains("open")) return;
+    if (typeof document.hasFocus === "function" && !document.hasFocus()) return;
+    var last = reader.body.lastElementChild || reader.body.children[reader.body.children.length - 1];
+    if (!last || !reader.hasText) return;
+    var rect = last.getBoundingClientRect();
+    // Only the actual text ending in the viewport counts, never the site footer.
+    if (rect.height > 0 && rect.bottom >= readerTop() && rect.bottom <= window.innerHeight - 12) {
+      if (progressStore.get(reader.series, reader.eps).completed.indexOf(reader.episode) >= 0) return;
+      progressStore.complete(reader.series, reader.episode, reader.epoch);
+      readerStatus(reader);
+    }
+  }
+  function beginReader(sid, epNo, eps, body, hasText, token, status, notice) {
+    var state = progressStore.get(sid, eps);
+    var resume = pendingResume && pendingResume.series === sid && pendingResume.episode === epNo ? pendingResume.position : (state.last && state.last.episode === epNo ? state.last.position : null);
+    pendingResume = null;
+    var reader = { series: sid, episode: epNo, eps: eps, body: body, hasText: hasText, token: token, epoch: state.epoch, stamp: { at: Date.now(), id: tabId + "-" + (++openSequence) }, layoutRevision: 0, ready: false, started: false, intent: false, suspended: false, status: status, notice: notice, saveTimer: null };
+    activeReader = reader;
+    progressViews.push(function () { readerStatus(reader); });
+    function activate() {
+      if (!visibleReader(reader)) return;
+      settleReader(reader, resume, function () {
+        if (!visibleReader(reader)) return;
+        reader.started = true;
+        saveReader(reader);
+        readerStatus(reader);
+      });
+    }
+    reader.activate = activate;
+    activate();
+    readerStatus(reader);
+  }
+  function readingInput(event) {
+    var reader = activeReader;
+    if (!visibleReader(reader) || !reader.ready || !reader.started || event.isTrusted === false || elSettings.classList.contains("open")) return;
+    if (event.type === "keydown") {
+      if (["ArrowDown", "PageDown", "End", " "].indexOf(event.key) < 0 || /^(BUTTON|INPUT|TEXTAREA|SELECT|A)$/.test((event.target && event.target.tagName) || "")) return;
+    } else if (event.type === "wheel" && !(event.deltaY > 0)) return;
+    reader.intent = true;
+    window.requestAnimationFrame(function () { checkCompletion(reader); });
+  }
+  window.addEventListener("wheel", readingInput, { passive: true });
+  window.addEventListener("touchmove", readingInput, { passive: true });
+  document.addEventListener("keydown", readingInput);
+  window.addEventListener("scroll", function () {
+    var reader = activeReader;
+    if (!visibleReader(reader) || !reader.ready || !reader.started) return;
+    var y = window.scrollY || 0;
+    if (y > reader.lastY + 1) reader.intent = true;
+    reader.lastY = y;
+    checkCompletion(reader);
+    if (!reader.saveTimer) reader.saveTimer = setTimeout(function () { reader.saveTimer = null; saveReader(reader); }, 350);
+  }, { passive: true });
+  window.addEventListener("pagehide", function () { saveReader(activeReader); });
+  document.addEventListener("visibilitychange", function () {
+    var reader = activeReader;
+    if (!reader) return;
+    if (document.visibilityState !== "visible") {
+      // Visibility already changed: flush the last visible position, not a new completion.
+      if (ownsReader(reader) && reader.ready && reader.started) progressStore.updateLast(reader.series, reader.episode, capturePosition(reader), reader.epoch, reader.stamp);
+      clearTimeout(reader.saveTimer); reader.saveTimer = null; reader.intent = false;
+    } else if (!reader.started) reader.activate();
+    else { reader.intent = false; reader.lastY = window.scrollY || 0; }
+  });
+  window.addEventListener("pageshow", function (event) {
+    if (!event.persisted) return;
+    if (activeReader) {
+      var reader = activeReader, state = progressStore.reload(reader.series);
+      if (state.epoch !== reader.epoch || (reader.started && !state.last)) {
+        reader.suspended = true; reader.ready = false; reader.layoutRevision++;
+        clearTimeout(reader.saveTimer); reader.saveTimer = null;
+      } else if (!reader.started) reader.activate();
+      reader.intent = false;
+    }
+    refreshProgressViews();
+  });
+  window.addEventListener("storage", function (event) {
+    var sid = progressStore.idForKey(event.key);
+    if (!sid && event.key !== null) return;
+    if (sid) progressStore.reload(sid, event.newValue);
+    var reader = activeReader;
+    if (reader && (!sid || sid === reader.series)) {
+      var state = progressStore.reload(reader.series);
+      if (state.epoch !== reader.epoch || event.key === null || event.newValue === null) {
+        reader.suspended = true; reader.ready = false; reader.layoutRevision++;
+        clearTimeout(reader.saveTimer); reader.saveTimer = null;
+        reader.status.textContent = "다른 탭에서 기록을 지웠습니다. 회차를 다시 열면 새로 기록합니다.";
+      }
+    }
+    refreshProgressViews();
+  });
+
   // ── 상태 라벨 ──
   var STATUS = {
     active:    { ko: "연재 중",   cls: "b-active" },
@@ -81,9 +322,13 @@
     try { localStorage.setItem(LS_KEY, JSON.stringify(settings)); } catch (e) {}
   }
   function applySettings() {
+    var reader = activeReader;
+    var anchor = reader && reader.ready ? capturePosition(reader) : null;
+    if (anchor) saveReader(reader);
     var root = document.documentElement.style;
     root.setProperty("--read-size", SIZE_STEPS[settings.size] + "rem");
     root.setProperty("--read-lh", String(LH_STEPS[settings.lh]));
+    if (anchor) settleReader(reader, anchor, function () { saveReader(reader); });
   }
 
   // ── 유틸: 안전 DOM 헬퍼 ──
@@ -176,6 +421,8 @@
 
   // Each navigation owns its response. Older fetches may finish, never repaint.
   function beginView(view) {
+    stopReader();
+    progressViews = [];
     var token = ++renderToken;
     closeSettings(false);
     elGear.hidden = true;
@@ -248,7 +495,22 @@
       shelfHeading.appendChild(el("span", null, series.length + "편의 이야기"));
       app.appendChild(shelfHeading);
       var list = el("div", "series-list");
-      series.forEach(function (s, index) { list.appendChild(seriesCard(s, index)); });
+      series.forEach(function (s, index) {
+        var card = seriesCard(s, index);
+        list.appendChild(card);
+        var slot = el("p", "card-progress"); slot.hidden = true;
+        card.querySelector(".book-info").appendChild(slot);
+        getJSON(DATA + "/series/" + encodeURIComponent(s.series_id) + "/meta.json").then(function (meta) {
+          if (token !== renderToken || !slot.isConnected) return;
+          var nums = publishedEpisodes(meta).map(function (ep) { return ep.episode; });
+          function refresh() {
+            var state = progressStore.get(s.series_id, nums);
+            slot.hidden = !state.last && !state.completed.length;
+            slot.textContent = "이 브라우저 · " + progressSummary(state);
+          }
+          progressViews.push(refresh); refresh();
+        }).catch(function () { /* An unavailable index must not invent a read count. */ });
+      });
       app.appendChild(list);
       var endnote = el("p", "library-endnote", "모든 회차는 AI가 생성한 창작물입니다. 글자 크기와 줄 간격은 읽기 화면에서 조절할 수 있습니다.");
       app.appendChild(endnote);
@@ -342,6 +604,7 @@
       }
       spread.appendChild(head);
       app.appendChild(spread);
+      app.appendChild(progressPanel(seriesId, eps.map(function (ep) { return ep.episode; })));
 
       var indexHead = el("div", "section-heading");
       indexHead.appendChild(el("h2", null, "차례"));
@@ -357,10 +620,14 @@
         var item = el("div"); item.setAttribute("role", "listitem");
         a.appendChild(el("span", "no", (ep.episode != null ? ep.episode : "?") + "화"));
         a.appendChild(el("span", "et", ep.title || "무제"));
+        var badge = el("span", "read-badge", " 읽음"); badge.hidden = true;
+        a.querySelector(".et").appendChild(badge);
+        progressViews.push(function () { badge.hidden = progressStore.get(seriesId, eps.map(function (item) { return item.episode; })).completed.indexOf(ep.episode) < 0; });
         if (ep.published_at) a.appendChild(el("span", "em", fmtDate(ep.published_at)));
         item.appendChild(a); list.appendChild(item);
       });
       app.appendChild(list);
+      refreshProgressViews();
       finishView(seriesTitle(m));
     }).catch(function (err) {
       if (token !== renderToken) return;
@@ -425,6 +692,8 @@
 
       // prev / toc / next — 한 줄 흐름(라벨 · 회차번호, 화살표는 바깥쪽)
       var ending = el("p", "reader-end", epNo + "화 끝"); app.appendChild(ending);
+      var readStatus = el("p", "reader-progress"); readStatus.setAttribute("role", "status"); app.appendChild(readStatus);
+      var localNotice = el("p", "local-note reader-local-note"); app.appendChild(localNotice);
       var nav = el("nav", "epnav"); nav.setAttribute("aria-label", "회차 이동");
       // 이전화
       if (prev != null) {
@@ -459,6 +728,7 @@
       app.appendChild(nav);
       elGear.hidden = false;
       finishView(ep.title + " — " + seriesTitle(m));
+      beginReader(seriesId, epNo, eps, body, !!raw.trim(), token, readStatus, localNotice);
     }).catch(function (err) {
       if (token !== renderToken) return;
       showError("회차를 불러오지 못했습니다. " + err.message, function () { renderEpisode(seriesId, epNo); });
@@ -580,6 +850,7 @@
   }
   function route() {
     var r = parseHash();
+    if (pendingResume && (r.view !== "episode" || r.series !== pendingResume.series || r.ep !== pendingResume.episode)) pendingResume = null;
     if (r.view === "episode") renderEpisode(r.series, r.ep);
     else if (r.view === "series") renderSeries(r.series);
     else if (r.view === "list") renderList();
